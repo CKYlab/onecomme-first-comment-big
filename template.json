@@ -1,0 +1,8 @@
+{
+  "name": "OneSDK Probe",
+  "author": "onecomme-first-comment-big contributors",
+  "link": "https://onecomme.com/docs/feature/templates/",
+  "description": "OneSDKから届く加工前コメントを画面・Console・メモリで観測する調査用テンプレート",
+  "width": 1280,
+  "height": 720
+}

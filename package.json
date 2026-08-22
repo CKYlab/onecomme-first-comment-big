@@ -1,0 +1,9 @@
+{
+  "name": "onecomme-one-sdk-probe",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OneSDK raw comment observation template for OneComme",
+  "scripts": {
+    "test": "node --test"
+  }
+}

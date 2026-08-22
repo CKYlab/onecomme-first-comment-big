@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OneSDK Probe</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body hidden>
+    <main class="probe-shell" aria-labelledby="probe-title">
+      <header class="probe-header">
+        <div>
+          <p class="eyebrow">TwitCasting anonymous comment research</p>
+          <h1 id="probe-title">OneSDK Probe</h1>
+          <p class="notice">
+            OneSDKから届いた加工前のコメントを、メモリ・画面・Consoleだけに記録します。
+          </p>
+        </div>
+        <div class="actions" aria-label="ログ操作">
+          <button id="copy-logs" type="button">Copy Logs</button>
+          <button id="clear-logs" class="secondary" type="button">Clear Logs</button>
+        </div>
+      </header>
+
+      <section class="status-bar" aria-label="Probe状態">
+        <p><span class="status-label">OneSDK</span> <span id="connection-status">Starting…</span></p>
+        <p><span class="status-label">Stored</span> <strong id="log-count">0</strong> / 100</p>
+        <p id="action-status" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="panel" aria-labelledby="summary-title">
+        <div class="panel-heading">
+          <h2 id="summary-title">Latest summary</h2>
+          <time id="received-at">No comments received</time>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Field</th><th scope="col">Observed value</th></tr>
+            </thead>
+            <tbody id="summary-body">
+              <tr><td colspan="2" class="empty">Waiting for a OneSDK comment…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel raw-panel" aria-labelledby="raw-title">
+        <div class="panel-heading">
+          <h2 id="raw-title">RAW JSON</h2>
+          <span>Latest detached snapshot</span>
+        </div>
+        <pre id="raw-json" tabindex="0">No comments received.</pre>
+      </section>
+    </main>
+
+    <script src="./probe-core.js"></script>
+    <script src="../__origin/js/onesdk.js"></script>
+    <script src="./script.js"></script>
+  </body>
+</html>

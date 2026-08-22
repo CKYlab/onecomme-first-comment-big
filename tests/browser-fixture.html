@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OneSDK Probe Browser Fixture</title>
+    <link rel="stylesheet" href="../style.css" />
+    <style>
+      .fixture-controls { width: min(1180px, calc(100% - 32px)); margin: 20px auto 0; padding: 14px 18px; border: 1px solid #8b5cf6; border-radius: 8px; background: #1d1534; }
+      .fixture-controls p { margin-bottom: 10px; color: #d8b4fe; }
+    </style>
+  </head>
+  <body hidden>
+    <aside class="fixture-controls">
+      <p><strong>Fixture only:</strong> 下の値は架空です。匿名番号の実フィールドを示す証拠には使用できません。</p>
+      <button id="emit-normal" type="button">Emit fake normal comment</button>
+      <button id="emit-anonymous" type="button">Emit fake anonymous-shaped comment</button>
+    </aside>
+
+    <main class="probe-shell" aria-labelledby="probe-title">
+      <header class="probe-header">
+        <div>
+          <p class="eyebrow">Browser fixture</p>
+          <h1 id="probe-title">OneSDK Probe</h1>
+          <p class="notice">Fake OneSDKで受信から表示までの配線だけを確認します。</p>
+        </div>
+        <div class="actions" aria-label="ログ操作">
+          <button id="copy-logs" type="button">Copy Logs</button>
+          <button id="clear-logs" class="secondary" type="button">Clear Logs</button>
+        </div>
+      </header>
+      <section class="status-bar" aria-label="Probe状態">
+        <p><span class="status-label">OneSDK</span> <span id="connection-status">Starting…</span></p>
+        <p><span class="status-label">Stored</span> <strong id="log-count">0</strong> / 100</p>
+        <p id="action-status" role="status" aria-live="polite"></p>
+      </section>
+      <section class="panel" aria-labelledby="summary-title">
+        <div class="panel-heading"><h2 id="summary-title">Latest summary</h2><time id="received-at">No comments received</time></div>
+        <div class="table-scroll"><table><thead><tr><th scope="col">Field</th><th scope="col">Observed value</th></tr></thead><tbody id="summary-body"></tbody></table></div>
+      </section>
+      <section class="panel raw-panel" aria-labelledby="raw-title">
+        <div class="panel-heading"><h2 id="raw-title">RAW JSON</h2><span>Latest detached snapshot</span></div>
+        <pre id="raw-json" tabindex="0">No comments received.</pre>
+      </section>
+    </main>
+
+    <script>
+      ;(() => {
+        let callback = null
+        window.OneSDK = {
+          PERM: { COMMENT: 'comment' },
+          ready: async () => {},
+          usePermission: () => ['comments'],
+          setup: async () => {},
+          subscribe: ({ callback: nextCallback }) => { callback = nextCallback; return 'fixture-subscriber' },
+          connect: async () => {},
+          unsubscribe: () => { callback = null },
+          emitComments: (comments) => { if (callback) callback(comments) },
+        }
+      })()
+    </script>
+    <script src="../probe-core.js"></script>
+    <script src="../script.js"></script>
+    <script>
+      const makeComment = (anonymousShape) => ({
+        id: anonymousShape ? 'fixture-anonymous-outer' : 'fixture-normal-outer',
+        service: 'twitcasting-fixture',
+        data: {
+          id: anonymousShape ? 'fixture-anonymous-comment' : 'fixture-normal-comment',
+          liveId: 'fixture-live',
+          userId: anonymousShape ? 'fixture-user-b' : 'fixture-user-a',
+          name: anonymousShape ? 'Fixture Anonymous' : 'Fixture Normal',
+          displayName: anonymousShape ? 'Fixture Anonymous Display' : 'Fixture Normal Display',
+          screenName: anonymousShape ? '' : 'fixture_normal',
+          isFirstTime: true,
+          isRepeater: false,
+          meta: anonymousShape ? { fixtureOnly: 'not-real-anonymous-data' } : { fixtureOnly: 'normal' },
+          comment: anonymousShape ? 'Fake anonymous-shaped comment' : 'Fake normal comment',
+          unknownFixtureField: { preserved: true },
+        },
+      })
+      document.getElementById('emit-normal').addEventListener('click', () => window.OneSDK.emitComments([makeComment(false)]))
+      document.getElementById('emit-anonymous').addEventListener('click', () => window.OneSDK.emitComments([makeComment(true)]))
+    </script>
+  </body>
+</html>
