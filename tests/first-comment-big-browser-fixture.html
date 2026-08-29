@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>初コメBIG Browser Fixture</title>
+    <link rel="stylesheet" href="../template/first-comment-big/style.css" />
+    <style>
+      .fixture-controls {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 12px;
+        padding: 12px;
+        border: 1px solid #8b5cf6;
+        border-radius: 8px;
+        background: #18112b;
+        color: #fff;
+        font: 14px/1.4 system-ui, sans-serif;
+        pointer-events: auto;
+      }
+
+      .fixture-controls p {
+        flex-basis: 100%;
+        margin: 0;
+      }
+
+      .fixture-controls button {
+        padding: 6px 10px;
+      }
+
+      body {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+      }
+
+      #comments {
+        position: relative;
+        inset: auto;
+        min-height: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <aside class="fixture-controls" aria-label="Fixture操作">
+      <p><strong>Fixture only:</strong> すべて架空のデータです。</p>
+      <button id="emit-normal-first" type="button">通常初コメ</button>
+      <button id="emit-normal-repeat" type="button">通常2回目</button>
+      <button id="emit-anonymous-first" type="button">匿名初コメ</button>
+      <button id="emit-anonymous-repeat" type="button">同一匿名2回目</button>
+      <button id="emit-anonymous-other" type="button">別匿名</button>
+      <button id="emit-gift" type="button">無料お茶</button>
+      <button id="emit-paid-no-comment" type="button">お茶爆100</button>
+      <button id="emit-paid-comment" type="button">お茶爆100コメント付き</button>
+      <button id="emit-paid-blue" type="button">お茶爆50</button>
+      <button id="emit-paid-orange" type="button">お茶爆500</button>
+      <button id="emit-invalid-colors" type="button">不正色Gift</button>
+      <button id="emit-anonymous-gift" type="button">匿名Gift</button>
+      <button id="emit-after-anonymous-gift" type="button">匿名Gift後コメント</button>
+      <button id="emit-restored" type="button">復元済み匿名</button>
+      <button id="emit-long" type="button">長文</button>
+      <button id="emit-kick-text" type="button">Kick通常</button>
+      <button id="emit-kick-emote" type="button">Kick通常エモート</button>
+      <button id="emit-kick-original" type="button">Kickオリジナル</button>
+      <button id="emit-kick-mixed" type="button">Kick文字＋エモート</button>
+      <button id="emit-kick-multiple" type="button">Kick複数エモート</button>
+      <button id="emit-kick-first" type="button">Kick初コメBIG</button>
+      <button id="emit-kick-broken" type="button">Kick画像失敗</button>
+      <button id="emit-kick-long" type="button">Kick長文＋エモート</button>
+      <button id="emit-kick-basic-100" type="button">Kick BASIC 100</button>
+      <button id="emit-kick-basic-100-image-failure" type="button">Kick BASIC 100画像失敗</button>
+      <button id="emit-kick-gift-1000" type="button">Kick KICKs 1000</button>
+      <button id="emit-kick-gift-1000-comment" type="button">Kick KICKs 1000コメント付き</button>
+      <button id="emit-kick-gift-10000" type="button">Kick KICKs 10000</button>
+      <button id="emit-kick-gift-fallback" type="button">Kick KICKs画像fallback</button>
+      <button id="emit-kick-gift-image-failure" type="button">Kick KICKs画像全失敗</button>
+      <button id="emit-twicas-owner-first" type="button">Twicas本人初回</button>
+      <button id="emit-twicas-owner-repeat" type="button">Twicas本人通常</button>
+      <button id="emit-twicas-owner-broken-image" type="button">Twicas本人画像失敗</button>
+      <button id="emit-kick-owner-emote" type="button">Kick本人＋エモート</button>
+      <button id="emit-kick-verified" type="button">Kick Verified初回</button>
+      <button id="emit-html-entities" type="button">文字参照</button>
+      <button id="emit-html-tags" type="button">HTML安全性</button>
+      <button id="emit-viewport-sequence" type="button">表示領域テスト</button>
+      <button id="dispose" type="button">Pagehide</button>
+    </aside>
+
+    <main id="comments" aria-live="polite" aria-label="初コメBIG表示領域"></main>
+
+    <script>
+      ;(() => {
+        const storageKey = 'onecomme.first-comment-big.anonymous-history.v1'
+        localStorage.setItem(
+          storageKey,
+          JSON.stringify({
+            version: 1,
+            lives: [
+              {
+                service: 'twicas',
+                liveId: 'fixture-live',
+                names: ['匿名コメント#3000'],
+              },
+            ],
+          }),
+        )
+
+        let callback = null
+        window.__fixtureState = {
+          action: null,
+          connected: false,
+          setup: null,
+          subscriberId: null,
+          unsubscribedId: null,
+        }
+        window.OneSDK = {
+          PERM: { COMMENT: 'comment' },
+          ready: async () => {},
+          usePermission: () => ['comments'],
+          setup: async (options) => {
+            window.__fixtureState.setup = options
+            document.documentElement.dataset.setup = JSON.stringify(options)
+          },
+          subscribe: ({ action, callback: nextCallback }) => {
+            callback = nextCallback
+            window.__fixtureState.action = action
+            window.__fixtureState.subscriberId = 'fixture-subscriber'
+            document.documentElement.dataset.action = action
+            document.documentElement.dataset.subscriberId = 'fixture-subscriber'
+            return 'fixture-subscriber'
+          },
+          connect: async () => {
+            window.__fixtureState.connected = true
+            document.documentElement.dataset.connected = 'true'
+          },
+          unsubscribe: (id) => {
+            window.__fixtureState.unsubscribedId = id
+            document.documentElement.dataset.unsubscribedId = id
+            callback = null
+          },
+          emitComments: (comments) => {
+            if (callback) callback(comments)
+          },
+        }
+      })()
+    </script>
+    <script src="../template/first-comment-big/first-comment-core.js"></script>
+    <script src="../template/first-comment-big/gift-presentation.js"></script>
+    <script src="../template/first-comment-big/kick-gift-presentation.js"></script>
+    <script src="../template/first-comment-big/kick-emote-presentation.js"></script>
+    <script src="../template/first-comment-big/script.js"></script>
+    <script>
+      ;(() => {
+        const emit = (comment) => window.OneSDK.emitComments([comment])
+        const normal = (text, isFirstTime) => ({
+          service: 'youtube',
+          data: { comment: text, isFirstTime },
+        })
+        const anonymous = (text, name) => ({
+          service: 'twicas',
+          data: {
+            comment: text,
+            isAnonymous: true,
+            liveId: 'fixture-live',
+            name,
+            screenName: 'c:tw1',
+            userId: 'twc-c:tw1',
+          },
+        })
+        const ownerImage = new URL('./fixture-gift.svg', window.location.href).href
+        const twicasOwner = (text, isFirstTime, profileImage = ownerImage) => ({
+          service: 'twicas',
+          data: {
+            comment: text,
+            hasGift: false,
+            isFirstTime,
+            isOwner: true,
+            profileImage,
+          },
+        })
+        const kick = (content, isFirstTime = false) => ({
+          service: 'kick',
+          data: {
+            comment: '<img src="https://unsafe.example.test/from-comment">HTMLは表示しない',
+            isFirstTime,
+            origin: { content },
+            speechText: content.replace(/\[emote:[0-9]+:([^\]]+)\]/g, '$1'),
+          },
+        })
+        const kickGift = ({
+          amount,
+          message = '',
+          backgroundColor,
+          textColor = '#333333',
+          staticUrl = new URL('./fixture-gift.svg', window.location.href).href,
+          animatedUrl = new URL('./fixture-gift.svg?animated', window.location.href).href,
+          includeAnimated = true,
+          giftId = amount === 10000 ? 'flex' : 'pack_it_up',
+          giftName = amount === 10000 ? 'Flex' : 'Pack It Up',
+          type = 'LEVEL_UP',
+          tier = amount === 10000 ? 'HIGHER' : 'MID',
+          characterLimit = 150,
+          pinnedTime,
+        }) => ({
+          service: 'kick',
+          data: {
+            comment: '<img src="https://unsafe.example.test/from-comment">HTMLは表示しない',
+            hasGift: true,
+            isFirstTime: true,
+            speechText: '',
+            gift: {
+              static_url: staticUrl,
+              ...(includeAnimated ? { animated_url: animatedUrl } : {}),
+              color: '#ff00ff',
+            },
+            colors: {
+              bodyBackgroundColor: backgroundColor,
+              bodyTextColor: textColor,
+            },
+            origin: {
+              message,
+              gift: {
+                gift_id: giftId,
+                name: giftName,
+                amount,
+                type,
+                tier,
+                character_limit: characterLimit,
+                ...(pinnedTime === undefined ? {} : { pinned_time: pinnedTime }),
+              },
+            },
+          },
+        })
+        const gift = ({
+          itemName,
+          speechText,
+          isFreeGift,
+          price,
+          backgroundColor,
+          textColor,
+          data = {},
+        }) => ({
+          service: 'twicas',
+          meta: { free: false },
+          data: {
+            comment: '<img src="unsafe">HTMLは表示しない',
+            hasGift: true,
+            isFirstTime: true,
+            isFreeGift,
+            price,
+            speechText,
+            colors: {
+              bodyBackgroundColor: backgroundColor,
+              bodyTextColor: textColor,
+            },
+            item: {
+              name: itemName,
+              image: new URL('./fixture-gift.svg', window.location.href).href,
+            },
+            ...data,
+          },
+        })
+        const recordGiftAssertion = ({
+          datasetKey,
+          expectedText,
+          expectedBackgroundColor,
+          expectedTextColor,
+        }) => {
+          const rendered = document.querySelector('#comments .comment')
+          const style = rendered ? getComputedStyle(rendered) : null
+          document.documentElement.dataset[datasetKey] = String(
+            rendered &&
+              rendered.textContent === expectedText &&
+              rendered.querySelector('.gift-image') &&
+              !rendered.classList.contains('comment--first') &&
+              style.backgroundColor === expectedBackgroundColor &&
+              style.color === expectedTextColor,
+          )
+        }
+
+        document.getElementById('emit-normal-first').addEventListener('click', () => emit(normal('通常初コメ本文', true)))
+        document.getElementById('emit-normal-repeat').addEventListener('click', () => emit(normal('通常2回目本文', false)))
+        document.getElementById('emit-anonymous-first').addEventListener('click', () => emit(anonymous('匿名初コメ本文', '匿名コメント#1000')))
+        document.getElementById('emit-anonymous-repeat').addEventListener('click', () => emit(anonymous('同一匿名2回目本文', '匿名コメント#1000')))
+        document.getElementById('emit-anonymous-other').addEventListener('click', () => emit(anonymous('別匿名本文', '匿名コメント#2000')))
+        document.getElementById('emit-gift').addEventListener('click', () => {
+          emit(gift({
+            itemName: 'お茶ｘ10',
+            speechText: 'お茶ｘ10 お茶ｘ10 (+🍡20)',
+            isFreeGift: true,
+            price: 0,
+            backgroundColor: 'rgb(42, 96, 178)',
+            textColor: 'rgb(255, 255, 255)',
+          }))
+          recordGiftAssertion({
+            datasetKey: 'freeGiftPass',
+            expectedText: 'お茶ｘ10 (+🍡20)',
+            expectedBackgroundColor: 'rgb(255, 255, 255)',
+            expectedTextColor: 'rgb(0, 0, 0)',
+          })
+        })
+        document.getElementById('emit-paid-no-comment').addEventListener('click', () => {
+          emit(gift({
+            itemName: 'お茶爆100',
+            speechText: 'お茶爆100 お茶爆100 (+🍡✨)',
+            isFreeGift: false,
+            price: 100,
+            backgroundColor: 'rgb(226, 181, 43)',
+            textColor: 'rgb(255, 255, 255)',
+          }))
+          recordGiftAssertion({
+            datasetKey: 'paidGiftNoCommentPass',
+            expectedText: 'お茶爆100 (+🍡✨)',
+            expectedBackgroundColor: 'rgb(226, 181, 43)',
+            expectedTextColor: 'rgb(255, 255, 255)',
+          })
+        })
+        document.getElementById('emit-paid-comment').addEventListener('click', () => {
+          emit(gift({
+            itemName: 'お茶爆100',
+            speechText: 'お茶爆100 お茶爆100 暑い中ありがとう(+🍡✨)',
+            isFreeGift: false,
+            price: 100,
+            backgroundColor: 'rgb(226, 181, 43)',
+            textColor: 'rgb(255, 255, 255)',
+          }))
+          recordGiftAssertion({
+            datasetKey: 'paidGiftCommentPass',
+            expectedText: 'お茶爆100 暑い中ありがとう(+🍡✨)',
+            expectedBackgroundColor: 'rgb(226, 181, 43)',
+            expectedTextColor: 'rgb(255, 255, 255)',
+          })
+        })
+        document.getElementById('emit-paid-blue').addEventListener('click', () => {
+          emit(gift({
+            itemName: 'お茶爆50',
+            speechText: 'お茶爆50 お茶爆50 (+🍡✨)',
+            isFreeGift: false,
+            price: 50,
+            backgroundColor: 'rgb(42, 96, 178)',
+            textColor: 'rgb(255, 255, 255)',
+          }))
+          recordGiftAssertion({
+            datasetKey: 'paidGiftBluePass',
+            expectedText: 'お茶爆50 (+🍡✨)',
+            expectedBackgroundColor: 'rgb(42, 96, 178)',
+            expectedTextColor: 'rgb(255, 255, 255)',
+          })
+        })
+        document.getElementById('emit-paid-orange').addEventListener('click', () => {
+          emit(gift({
+            itemName: 'お茶爆500',
+            speechText: 'お茶爆500 お茶爆500 (+🍡✨)',
+            isFreeGift: false,
+            price: 500,
+            backgroundColor: 'rgb(224, 148, 67)',
+            textColor: 'rgb(255, 255, 255)',
+          }))
+          recordGiftAssertion({
+            datasetKey: 'paidGiftOrangePass',
+            expectedText: 'お茶爆500 (+🍡✨)',
+            expectedBackgroundColor: 'rgb(224, 148, 67)',
+            expectedTextColor: 'rgb(255, 255, 255)',
+          })
+        })
+        document.getElementById('emit-invalid-colors').addEventListener('click', () => {
+          emit(gift({
+            itemName: '不正色Gift',
+            speechText: '不正色Gift 不正色Gift コメント',
+            isFreeGift: false,
+            price: 999,
+            backgroundColor: 'not-a-color',
+            textColor: 'url(https://invalid.test/color)',
+          }))
+          recordGiftAssertion({
+            datasetKey: 'invalidGiftColorsPass',
+            expectedText: '不正色Gift コメント',
+            expectedBackgroundColor: 'rgb(255, 255, 255)',
+            expectedTextColor: 'rgb(0, 0, 0)',
+          })
+        })
+        document.getElementById('emit-anonymous-gift').addEventListener('click', () => emit({
+          service: 'twicas',
+          data: {
+            comment: '<img src="unsafe">匿名Gift',
+            hasGift: true,
+            isAnonymous: true,
+            isFirstTime: true,
+            liveId: 'fixture-live',
+            name: '匿名コメント#4000',
+            screenName: 'c:tw1',
+            userId: 'twc-c:tw1',
+            speechText: 'Tea x 10 Tea x 10 (+🍡20)',
+            item: {
+              name: 'Tea x 10',
+              image: new URL('./fixture-gift.svg', window.location.href).href,
+            },
+          },
+        }))
+        document.getElementById('emit-after-anonymous-gift').addEventListener('click', () => emit(anonymous('匿名Gift後の初コメント本文', '匿名コメント#4000')))
+        document.getElementById('emit-restored').addEventListener('click', () => emit(anonymous('復元済み匿名本文', '匿名コメント#3000')))
+        document.getElementById('emit-long').addEventListener('click', () => emit(normal('長いコメントの折り返し確認用本文です。'.repeat(16), true)))
+        document.getElementById('emit-kick-text').addEventListener('click', () => emit(kick('Kick通常コメント')))
+        document.getElementById('emit-kick-emote').addEventListener('click', () => emit(kick('[emote:5747999:collectiblesGoldenFIRE]')))
+        document.getElementById('emit-kick-original').addEventListener('click', () => emit(kick('[emote:5679209:chobitsukiorewa]')))
+        document.getElementById('emit-kick-mixed').addEventListener('click', () => emit(kick('出発[emote:5747999:collectiblesGoldenFIRE]到着')))
+        document.getElementById('emit-kick-multiple').addEventListener('click', () => emit(kick('A[emote:5747999:collectiblesGoldenFIRE]B[emote:5679209:chobitsukiorewa]C[emote:5747999:collectiblesGoldenFIRE]')))
+        document.getElementById('emit-kick-first').addEventListener('click', () => emit(kick('初コメ[emote:5679209:chobitsukiorewa]', true)))
+        document.getElementById('emit-kick-broken').addEventListener('click', () => emit(kick('失敗[emote:999999999:brokenEmote]後続')))
+        document.getElementById('emit-kick-long').addEventListener('click', () => emit(kick(`${'Kick長文折り返し'.repeat(20)}[emote:5747999:collectiblesGoldenFIRE]末尾`, true)))
+        document.getElementById('emit-kick-basic-100').addEventListener('click', () => emit(kickGift({
+          amount: 100,
+          backgroundColor: '#18FBB0',
+          textColor: '#333',
+          includeAnimated: false,
+          giftId: 'full_send',
+          giftName: 'Full Send',
+          type: 'BASIC',
+          tier: 'BASIC',
+          characterLimit: 0,
+          pinnedTime: 0,
+        })))
+        document.getElementById('emit-kick-basic-100-image-failure').addEventListener('click', () => emit(kickGift({
+          amount: 100,
+          backgroundColor: '#18FBB0',
+          textColor: '#333',
+          staticUrl: new URL('./missing-kick-basic-static.webp', window.location.href).href,
+          includeAnimated: false,
+          giftId: 'full_send',
+          giftName: 'Full Send',
+          type: 'BASIC',
+          tier: 'BASIC',
+          characterLimit: 0,
+          pinnedTime: 0,
+        })))
+        document.getElementById('emit-kick-gift-1000').addEventListener('click', () => emit(kickGift({
+          amount: 1000,
+          backgroundColor: '#18E9FB',
+        })))
+        document.getElementById('emit-kick-gift-1000-comment').addEventListener('click', () => emit(kickGift({
+          amount: 1000,
+          message: '下山も頑張れ～！',
+          backgroundColor: '#18E9FB',
+        })))
+        document.getElementById('emit-kick-gift-10000').addEventListener('click', () => emit(kickGift({
+          amount: 10000,
+          backgroundColor: '#FCB645',
+        })))
+        document.getElementById('emit-kick-gift-fallback').addEventListener('click', () => emit(kickGift({
+          amount: 1000,
+          message: '&lt;script&gt;window.__fixtureExecuted=true&lt;/script&gt;',
+          backgroundColor: '#18E9FB',
+          staticUrl: new URL('./missing-kick-gift-static.webp', window.location.href).href,
+        })))
+        document.getElementById('emit-kick-gift-image-failure').addEventListener('click', () => emit(kickGift({
+          amount: 1000,
+          message: '画像がなくても残るコメント',
+          backgroundColor: '#18E9FB',
+          staticUrl: new URL('./missing-kick-gift-static.webp', window.location.href).href,
+          animatedUrl: new URL('./missing-kick-gift-animated.webp', window.location.href).href,
+        })))
+        document.getElementById('emit-twicas-owner-first').addEventListener('click', () => emit(twicasOwner('Twicas本人初回コメント', true)))
+        document.getElementById('emit-twicas-owner-repeat').addEventListener('click', () => emit(twicasOwner('Twicas本人通常コメント', false)))
+        document.getElementById('emit-twicas-owner-broken-image').addEventListener('click', () => emit(twicasOwner('画像失敗でも残る本人コメント', true, 'https://fixture.local/missing-owner.png')))
+        document.getElementById('emit-kick-owner-emote').addEventListener('click', () => emit({
+          service: 'kick',
+          data: {
+            comment: '<img src="unsafe">Kick本人HTMLは不使用',
+            isFirstTime: true,
+            isOwner: false,
+            isRepeater: true,
+            profileImage: ownerImage,
+            speechText: 'Kick本人collectiblesGoldenFIRE',
+            origin: {
+              content: 'Kick本人[emote:5747999:collectiblesGoldenFIRE]',
+              sender: {
+                identity: {
+                  badges: [
+                    { type: 'broadcaster', text: 'Broadcaster' },
+                    { type: 'verified', text: 'Verified channel' },
+                  ],
+                },
+              },
+            },
+          },
+        }))
+        document.getElementById('emit-kick-verified').addEventListener('click', () => emit({
+          service: 'kick',
+          data: {
+            comment: 'Kick Verified初回',
+            isFirstTime: true,
+            isOwner: false,
+            profileImage: ownerImage,
+            origin: {
+              content: 'Kick Verified初回',
+              sender: {
+                identity: {
+                  badges: [{ type: 'verified', text: 'Verified channel' }],
+                },
+              },
+            },
+          },
+        }))
+        document.getElementById('emit-html-entities').addEventListener('click', () => emit(normal('見た(´&gt;ω&lt;｀)☆ &amp;gt; &#62; &#x3C;', false)))
+        document.getElementById('emit-html-tags').addEventListener('click', () => emit(normal('&lt;script&gt;window.__fixtureExecuted=true&lt;/script&gt;&lt;img onerror="window.__fixtureExecuted=true"&gt;', false)))
+        document.getElementById('emit-viewport-sequence').addEventListener('click', () => {
+          const container = document.getElementById('comments')
+          container.replaceChildren()
+
+          const comments = Array.from({ length: 30 }, (_, index) => {
+            const number = index + 1
+            if (number === 28) {
+              return normal(`表示領域${number} 長文${'折り返し確認'.repeat(8)}`, false)
+            }
+            return normal(`表示領域${number}${number === 29 ? ' BIG' : ''}`, number === 29)
+          })
+          window.OneSDK.emitComments(comments)
+
+          const rendered = Array.from(container.querySelectorAll('.comment'))
+          const numbers = rendered.map((element) => {
+            const match = element.textContent.match(/^表示領域(\d+)/)
+            return match ? Number(match[1]) : null
+          })
+          const newestFirst = numbers.every(
+            (number, index) => number === 30 - index,
+          )
+          const fitsVertically =
+            container.scrollHeight <= container.clientHeight ||
+            container.childElementCount === 1
+
+          document.documentElement.dataset.viewportFitPass = String(
+            rendered.length > 1 &&
+              rendered.length < comments.length &&
+              newestFirst &&
+              fitsVertically &&
+              rendered.some((element) => element.classList.contains('comment--first')) &&
+              rendered.some((element) => element.textContent.includes('長文')),
+          )
+        })
+        document.getElementById('dispose').addEventListener('click', () => window.dispatchEvent(new Event('pagehide')))
+      })()
+    </script>
+  </body>
+</html>

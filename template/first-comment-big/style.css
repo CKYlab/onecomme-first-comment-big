@@ -1,0 +1,143 @@
+:root {
+  --comment-font-size: 32px;
+  --first-comment-font-size: 64px;
+  --panel-background: #ffffff;
+  --comment-text-color: var(--comment-color, #000000);
+  --comment-border-color: #d8d8d8;
+  --comment-padding-x: 16px;
+  --comment-padding-y: 10px;
+  --gift-image-size: 1.65em;
+  --kick-emote-size: 1.4em;
+  --kick-gift-image-size: 36px;
+  --kick-gift-image-max-width: 120px;
+  --kick-gift-content-gap: 8px;
+  --gift-content-gap: 10px;
+  --owner-image-size: 30px;
+  --owner-content-gap: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--panel-background, #ffffff) !important;
+}
+
+body {
+  position: relative;
+}
+
+#comments {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: 0;
+  overflow-x: hidden;
+  overflow-y: hidden;
+  background: var(--panel-background, #ffffff);
+  pointer-events: none;
+}
+
+.comment {
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: var(--comment-padding-y, 10px) var(--comment-padding-x, 16px);
+  border-bottom: 1px solid var(--comment-border-color, #d8d8d8);
+  color: var(--comment-text-color, #000000);
+  font-family: "Yu Gothic UI", "Yu Gothic", Meiryo, sans-serif;
+  font-size: var(--comment-font-size, 32px);
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.comment--first {
+  font-size: var(--first-comment-font-size, 64px);
+}
+
+.comment--gift {
+  display: flex;
+  align-items: center;
+  gap: var(--gift-content-gap, 10px);
+}
+
+.comment--kick-gift {
+  display: block;
+}
+
+.kick-gift__header {
+  display: flex;
+  align-items: center;
+  gap: var(--kick-gift-content-gap, 8px);
+  min-width: 0;
+}
+
+.kick-gift__image {
+  flex: 0 1 auto;
+  width: auto;
+  height: var(--kick-gift-image-size, 36px);
+  max-width: var(--kick-gift-image-max-width, 120px);
+  object-fit: contain;
+}
+
+.kick-gift__amount {
+  min-width: 0;
+}
+
+.kick-gift__message {
+  display: block;
+  min-width: 0;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.comment--owner {
+  display: flex;
+  align-items: center;
+  gap: var(--owner-content-gap, 10px);
+}
+
+.gift-image {
+  flex: 0 0 auto;
+  width: var(--gift-image-size, 1.65em);
+  height: var(--gift-image-size, 1.65em);
+  object-fit: contain;
+}
+
+.kick-emote {
+  display: inline-block;
+  width: auto;
+  height: var(--kick-emote-size, 1.4em);
+  vertical-align: middle;
+}
+
+.owner-image {
+  flex: 0 0 auto;
+  width: var(--owner-image-size, 30px);
+  height: var(--owner-image-size, 30px);
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.comment-text {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
