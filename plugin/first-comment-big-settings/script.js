@@ -77,13 +77,29 @@
       firstCommentFontSize.value = String(normalized.firstCommentFontSize)
     }
 
+    async function readResponseSettings(response) {
+      if (!response || !response.ok) throw new Error('Settings request failed')
+      const payload = await response.json()
+      if (
+        !payload ||
+        typeof payload !== 'object' ||
+        Array.isArray(payload) ||
+        payload.code !== 200 ||
+        !payload.response ||
+        typeof payload.response !== 'object' ||
+        Array.isArray(payload.response)
+      ) {
+        throw new Error('Invalid settings response')
+      }
+      return payload.response
+    }
+
     async function load() {
       const startingSaveGeneration = saveGeneration
       beginRequest()
       try {
         const response = await fetchImpl(endpoint, { method: 'GET' })
-        if (!response || !response.ok) throw new Error('GET settings failed')
-        const responseSettings = await response.json()
+        const responseSettings = await readResponseSettings(response)
         if (startingSaveGeneration !== saveGeneration) return
         applySettings(responseSettings)
         status.textContent = ''
@@ -112,8 +128,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(settings),
         })
-        if (!response || !response.ok) throw new Error('PUT settings failed')
-        const responseSettings = await response.json()
+        const responseSettings = await readResponseSettings(response)
         if (currentSaveGeneration !== saveGeneration) return
         applySettings(responseSettings)
         status.textContent = '保存しました。'

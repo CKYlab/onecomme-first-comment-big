@@ -70,10 +70,13 @@ test('loadはGET応答を正規化して3入力へ反映する', async () => {
     async fetchImpl(url, options) {
       calls.push({ url, options })
       return jsonResponse({
-        theme: 'dark',
-        commentFontSize: 40,
-        firstCommentFontSize: 80,
-        ignored: true,
+        code: 200,
+        response: {
+          theme: 'dark',
+          commentFontSize: 40,
+          firstCommentFontSize: 80,
+          ignored: true,
+        },
       })
     },
   })
@@ -88,6 +91,30 @@ test('loadはGET応答を正規化して3入力へ反映する', async () => {
   assert.equal(document.elements.get('comment-font-size').value, '40')
   assert.equal(document.elements.get('first-comment-font-size').value, '80')
   assert.equal(document.elements.get('status').textContent, '')
+})
+
+test('loadはHTTP成功でもplugin codeが200以外なら取得失敗として扱う', async () => {
+  const document = createFakeDocument()
+  document.elements.get('theme').value = 'dark'
+  document.elements.get('comment-font-size').value = '40'
+  document.elements.get('first-comment-font-size').value = '80'
+  const controller = createSettingsPageController({
+    document,
+    settingsCore,
+    async fetchImpl() {
+      return jsonResponse({ code: 400, response: { message: 'error' } })
+    },
+  })
+
+  await controller.load()
+
+  assert.equal(document.elements.get('theme').value, 'light')
+  assert.equal(document.elements.get('comment-font-size').value, '32')
+  assert.equal(document.elements.get('first-comment-font-size').value, '64')
+  assert.equal(
+    document.elements.get('status').textContent,
+    '設定を取得できませんでした。',
+  )
 })
 
 test('load失敗時は既定値と固定の取得失敗文を表示する', async () => {
@@ -154,7 +181,10 @@ test('初期load中は保存ボタンを無効化し完了後に戻す', async (
 
   assert.equal(document.elements.get('save').disabled, true)
 
-  response.resolve(jsonResponse(settingsCore.DEFAULT_SETTINGS))
+  response.resolve(jsonResponse({
+    code: 200,
+    response: settingsCore.DEFAULT_SETTINGS,
+  }))
   await loading
 
   assert.equal(document.elements.get('save').disabled, false)
@@ -179,15 +209,21 @@ test('新しいsave完了後に初期GET成功が遅れても保存結果を上�
   const saving = controller.save()
 
   putResponse.resolve(jsonResponse({
-    theme: 'dark',
-    commentFontSize: 41,
-    firstCommentFontSize: 81,
+    code: 200,
+    response: {
+      theme: 'dark',
+      commentFontSize: 41,
+      firstCommentFontSize: 81,
+    },
   }))
   await saving
   getResponse.resolve(jsonResponse({
-    theme: 'light',
-    commentFontSize: 20,
-    firstCommentFontSize: 30,
+    code: 200,
+    response: {
+      theme: 'light',
+      commentFontSize: 20,
+      firstCommentFontSize: 30,
+    },
   }))
   await loading
 
@@ -228,9 +264,12 @@ test('新しいsave中に初期GET失敗が先に完了しても入力と状態�
     saveDisabled: document.elements.get('save').disabled,
   }
   putResponse.resolve(jsonResponse({
-    theme: 'dark',
-    commentFontSize: 40,
-    firstCommentFontSize: 80,
+    code: 200,
+    response: {
+      theme: 'dark',
+      commentFontSize: 40,
+      firstCommentFontSize: 80,
+    },
   }))
   await saving
 
@@ -260,9 +299,12 @@ test('saveはvalueAsNumberから完全設定をPUTして応答を再反映する
     async fetchImpl(url, options) {
       calls.push({ url, options })
       return jsonResponse({
-        theme: 'dark',
-        commentFontSize: 41,
-        firstCommentFontSize: 81,
+        code: 200,
+        response: {
+          theme: 'dark',
+          commentFontSize: 40,
+          firstCommentFontSize: 80,
+        },
       })
     },
   })
@@ -281,9 +323,35 @@ test('saveはvalueAsNumberから完全設定をPUTして応答を再反映する
     firstCommentFontSize: 80,
   })
   assert.equal(document.elements.get('theme').value, 'dark')
-  assert.equal(document.elements.get('comment-font-size').value, '41')
-  assert.equal(document.elements.get('first-comment-font-size').value, '81')
+  assert.equal(document.elements.get('comment-font-size').value, '40')
+  assert.equal(document.elements.get('first-comment-font-size').value, '80')
   assert.equal(document.elements.get('status').textContent, '保存しました。')
+})
+
+test('saveはHTTP成功でもplugin codeが200以外なら入力を保持して失敗表示する', async () => {
+  const document = createFakeDocument()
+  document.elements.get('theme').value = 'dark'
+  document.elements.get('comment-font-size').value = '40'
+  document.elements.get('comment-font-size').valueAsNumber = 40
+  document.elements.get('first-comment-font-size').value = '80'
+  document.elements.get('first-comment-font-size').valueAsNumber = 80
+  const controller = createSettingsPageController({
+    document,
+    settingsCore,
+    async fetchImpl() {
+      return jsonResponse({ code: 400, response: { message: 'error' } })
+    },
+  })
+
+  await controller.save()
+
+  assert.equal(document.elements.get('theme').value, 'dark')
+  assert.equal(document.elements.get('comment-font-size').value, '40')
+  assert.equal(document.elements.get('first-comment-font-size').value, '80')
+  assert.equal(
+    document.elements.get('status').textContent,
+    '設定を保存できませんでした。',
+  )
 })
 
 test('save中だけ保存ボタンを無効化する', async () => {
@@ -300,7 +368,10 @@ test('save中だけ保存ボタンを無効化する', async () => {
   const saving = controller.save()
   assert.equal(document.elements.get('save').disabled, true)
 
-  response.resolve(jsonResponse(settingsCore.DEFAULT_SETTINGS))
+  response.resolve(jsonResponse({
+    code: 200,
+    response: settingsCore.DEFAULT_SETTINGS,
+  }))
   await saving
 
   assert.equal(document.elements.get('save').disabled, false)
@@ -352,9 +423,12 @@ test('ブラウザ起動時に必須DOMを確認してsubmit登録と初期GET�
     async fetch(url, options) {
       calls.push({ url, options })
       return jsonResponse({
-        theme: 'dark',
-        commentFontSize: 40,
-        firstCommentFontSize: 80,
+        code: 200,
+        response: {
+          theme: 'dark',
+          commentFontSize: 40,
+          firstCommentFontSize: 80,
+        },
       })
     },
   }
