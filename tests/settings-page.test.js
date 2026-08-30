@@ -4,6 +4,7 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
+const vm = require('node:vm')
 
 const settingsCore = require('../plugin/first-comment-big-settings/settings-core.js')
 const {
@@ -110,6 +111,34 @@ test('load失敗時は既定値と固定の取得失敗文を表示する', asyn
   )
 })
 
+test('loadはGETの非ok応答を失敗として既定値へ戻す', async () => {
+  const document = createFakeDocument()
+  document.elements.get('theme').value = 'dark'
+  document.elements.get('comment-font-size').value = '40'
+  document.elements.get('first-comment-font-size').value = '80'
+  const controller = createSettingsPageController({
+    document,
+    settingsCore,
+    async fetchImpl() {
+      return jsonResponse({
+        theme: 'dark',
+        commentFontSize: 40,
+        firstCommentFontSize: 80,
+      }, false)
+    },
+  })
+
+  await controller.load()
+
+  assert.equal(document.elements.get('theme').value, 'light')
+  assert.equal(document.elements.get('comment-font-size').value, '32')
+  assert.equal(document.elements.get('first-comment-font-size').value, '64')
+  assert.equal(
+    document.elements.get('status').textContent,
+    '設定を取得できませんでした。',
+  )
+})
+
 test('saveはvalueAsNumberから完全設定をPUTして応答を再反映する', async () => {
   const document = createFakeDocument()
   document.elements.get('theme').value = 'dark'
@@ -196,6 +225,60 @@ test('save失敗時は入力を保持して固定の保存失敗文を表示す�
     '設定を保存できませんでした。',
   )
   assert.equal(document.elements.get('save').disabled, false)
+})
+
+test('ブラウザ起動時に必須DOMを確認してsubmit登録と初期GETを行う', async () => {
+  const document = createFakeDocument()
+  const lookedUpIds = []
+  const getElementById = document.getElementById.bind(document)
+  document.getElementById = (id) => {
+    lookedUpIds.push(id)
+    return getElementById(id)
+  }
+  const calls = []
+  const source = fs.readFileSync(
+    path.join(__dirname, '..', 'plugin', 'first-comment-big-settings', 'script.js'),
+    'utf8',
+  )
+  const context = {
+    document,
+    FirstCommentBigSettingsCore: settingsCore,
+    async fetch(url, options) {
+      calls.push({ url, options })
+      return jsonResponse({
+        theme: 'dark',
+        commentFontSize: 40,
+        firstCommentFontSize: 80,
+      })
+    },
+  }
+
+  vm.runInNewContext(source, context, { filename: 'settings-page-script.js' })
+  await new Promise((resolve) => setImmediate(resolve))
+
+  for (const id of [
+    'settings-form',
+    'theme',
+    'comment-font-size',
+    'first-comment-font-size',
+    'save',
+    'status',
+  ]) {
+    assert.equal(lookedUpIds.includes(id), true, `${id} must be looked up`)
+  }
+  assert.equal(
+    typeof document.elements.get('settings-form').listeners.get('submit'),
+    'function',
+  )
+  assert.equal(calls.length, 1)
+  assert.equal(
+    calls[0].url,
+    'http://localhost:11180/api/plugins/com.ckylab.first-comment-big-settings',
+  )
+  assert.equal(calls[0].options.method, 'GET')
+  assert.equal(document.elements.get('theme').value, 'dark')
+  assert.equal(document.elements.get('comment-font-size').value, '40')
+  assert.equal(document.elements.get('first-comment-font-size').value, '80')
 })
 
 test('設定画面はinnerHTMLを使用しない', () => {
