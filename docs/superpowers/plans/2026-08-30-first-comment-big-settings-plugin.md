@@ -322,7 +322,7 @@ Expected: 新しいsettings-coreテストが全件PASSし、既存70件も含め
 **Interfaces:**
 
 - Produces CommonJS OnePlugin object with name、uid、version、author、url、permissions、defaultState、init、request。
-- init({ store }, initialData): store参照を保持し、初期状態を正規化して必要時だけ保存。
+- init({ store }): store参照を保持し、永続設定をstore.storeだけから正規化して必要時だけ保存。わんコメから別用途で渡されるinitialDataは設定入力に使わない。
 - request(req): Promise<{ code: number, response: object }>
 - store contract: store.store getter/setter。setter呼び出し回数をテストで観測する。
 
@@ -351,7 +351,8 @@ tests/settings-plugin.test.jsは各テストでrequire cacheを削除して新�
 
 - メタデータが設計値と一致し、Task 1通過後のpermissionsが[]。
 - defaultStateが完全な既定設定である。
-- initが不正initialDataを正規化し、既に同値なら書き込まない。
+- initがstore.storeの保存済み設定を正規化し、既に正規形なら書き込まない。
+- initialDataに空オブジェクトまたは設定と無関係な値が渡されても、store.storeに保存済みのdark / 40 / 80を維持する。
 - GETが完全な正規化設定を返し、不正値、欠落キー、未知キーを持つstoreを1回だけ正規形へ修復する。
 - 同一状態の連続GETがstore setterを増やさない。
 - PUTがJSON解析、項目別正規化、完全設定の保存、完全設定応答を行う。
@@ -359,6 +360,25 @@ tests/settings-plugin.test.jsは各テストでrequire cacheを削除して新�
 - 構文不正JSONがcode 400で直前状態を維持する。
 - JSONのnull、配列、文字列は全項目を既定値へ正規化する。
 - GET/PUT以外（公式APIで到達し得るPOSTとDELETE）はcode 404で状態を変更しない。
+
+initialData非干渉の回帰テストは次の形にする。
+
+    test('initialDataを永続設定へ使用せずstoreの保存済み設定を維持する', () => {
+      for (const initialData of [{}, { waitingList: ['unrelated'] }]) {
+        const plugin = loadPlugin()
+        const saved = {
+          theme: 'dark',
+          commentFontSize: 40,
+          firstCommentFontSize: 80,
+        }
+        const store = makeStore(saved)
+
+        plugin.init({ store }, initialData)
+
+        assert.deepEqual(store.snapshot(), saved)
+        assert.equal(store.writes(), 0)
+      }
+    })
 
 - [ ] **Step 2: focusedテストを実行してREDを確認する**
 
@@ -406,10 +426,9 @@ plugin.jsは@onecomme.com/onesdkをruntime requireせず、公式サンプルと
       permissions: [],
       defaultState: { ...DEFAULT_SETTINGS },
 
-      init({ store }, initialData) {
+      init({ store }) {
         this.store = store
-        const source = initialData === undefined ? store.store : initialData
-        const normalized = normalizeSettings(source)
+        const normalized = normalizeSettings(store.store)
         persistIfChanged(this, normalized)
       },
 
@@ -436,7 +455,7 @@ plugin.jsは@onecomme.com/onesdkをruntime requireせず、公式サンプルと
 
     module.exports = plugin
 
-実装時にはinitのinitialDataとstore.storeの公式挙動をサンプルで再確認する。initialDataが未定義の場合でも既定値へ正規化し、store未注入時のrequestは例外ではなく完全な既定設定を返す。不要な権限やsubscribe関数を追加しない。
+initへinitialDataが追加引数として渡されてもJavaScriptの余剰引数として無視し、設定の読み込み、正規化、保存には使用しない。保存済み設定は常にstore.storeから復元する。store未注入時のrequestは例外ではなく完全な既定設定を返す。不要な権限やsubscribe関数を追加しない。
 
 - [ ] **Step 4: focused GREENと回帰を確認する**
 
@@ -446,7 +465,7 @@ Run:
     npm test
     node --check plugin/first-comment-big-settings/plugin.js
 
-Expected: APIテスト全件PASS、全Nodeテストfail 0、構文check exit 0。
+Expected: APIテスト全件PASS。空オブジェクトと無関係なinitialDataの両ケースでdark / 40 / 80が維持され、不要なstore書き込みは0回。全Nodeテストfail 0、構文check exit 0。
 
 - [ ] **Step 5: REST APIプラグインをcommitする**
 
@@ -677,7 +696,8 @@ tests/settings-client.test.jsでindex.htmlとscript.jsを文字列として読�
 - index.htmlで./settings-client.jsが./script.jsより前、../__origin/js/onesdk.js参照は変更なし。
 - script.jsがwindow.FirstCommentBigSettingsClientを取得する。
 - createSettingsClientへdocument.documentElementとfitCommentsToViewportを渡す。
-- settingsClient.start()をOneSDK.initialize promiseへ連結せず開始する。
+- settingsClient.start()をOneSDK.initialize promiseへ連結せず開始し、返されたPromiseへ最終catchを付ける。
+- settingsClient.start()が予期せずrejectしてもwarnで収容され、unhandled rejectionにならずOneSDK initializeがconnectまで継続する。
 - dispose内でsettingsClient.stop()を呼ぶ。
 - 既存のcontainer.prepend、scrollHeight > clientHeight、lastElementChild.remove、MAX_COMMENT_ELEMENTS = 100が残る。
 - applyGiftColorsのelement.style.backgroundColorとelement.style.colorが残る。
@@ -687,6 +707,8 @@ Run:
     node --test tests/settings-client.test.js
 
 Expected: settings-client.jsのscript tagとscript.js接続がないため新しいassertだけFAIL。Task 5テストはPASS。
+
+非同期安全網のテストではnode:vmでscript.jsを実行し、createSettingsClientがstart()からPromise.reject(new Error('unexpected settings start failure'))を返すfake clientを提供する。fake OneSDKのready/setup/subscribe/connectは成功させ、console.warn、connect呼び出し回数、processのunhandledRejectionを記録する。microtask完了後、警告が1回、connectが1回、unhandledRejectionが0件であることをassertする。現行のvoid settingsClient.start()ではrejectionが収容されないためREDになることを確認する。
 
 - [ ] **Step 2: index.htmlへscriptを1行追加する**
 
@@ -711,13 +733,18 @@ Expected: settings-client.jsのscript tagとscript.js接続がないため新し
           rootElement: document.documentElement,
           fitCommentsToViewport,
         })
-        void settingsClient.start()
+        void settingsClient.start().catch((error) => {
+          console.warn(
+            '[初コメBIG] 設定機能を開始できないため既定表示を使用します。',
+            error,
+          )
+        })
       } catch (error) {
         console.warn('[初コメBIG] 設定機能を開始できないため既定表示を使用します。', error)
       }
     }
 
-startSettingsClientはinitialize()とは別に呼ぶ。設定クライアント欠落・生成失敗・start内部のAPI失敗をinitialize().catchへ渡さない。
+startSettingsClientはinitialize()とは別に呼ぶ。API未導入、HTTP失敗、不正JSONなどの想定内エラーはTask 5どおりsettings-client内部で処理し、start()自体をrejectさせない。ここで追加するcatchは想定外の非同期例外に対する最終安全網であり、その例外もinitialize().catchへ渡さずunhandled rejectionにしない。設定クライアント欠落と同期的な生成失敗は外側のtry/catchで従来どおり収容する。
 
 disposeではdisposedの確定とpagehide listener解除後、OneSDK unsubscribeの前にsettingsClient.stopを専用try/catchで呼ぶ。stop失敗後もunsubscribeへ進み、unsubscribe失敗後もstop済みである構造にする。既存コメント処理の条件、分岐、DOM生成、prepend、fit処理を変更しない。
 
@@ -730,7 +757,7 @@ Run:
     git diff --check
     git diff -- template/first-comment-big/index.html template/first-comment-big/script.js
 
-Expected: focusedテストと全NodeテストPASS。index.htmlは1 script追加だけ。script.js差分は設定ライフサイクルだけで、receiveComments、renderModel、applyGiftColors、fitCommentsToViewportの既存本体に機能差分がない。
+Expected: focusedテストと全NodeテストPASS。予期しないstart rejectで警告1回、unhandled rejection 0件、OneSDK connect 1回。index.htmlは1 script追加だけ。script.js差分は設定ライフサイクルだけで、receiveComments、renderModel、applyGiftColors、fitCommentsToViewportの既存本体に機能差分がない。
 
 - [ ] **Step 5: 最小接続をcommitする**
 
