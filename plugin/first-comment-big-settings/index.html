@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>初コメBIG 設定</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main>
+      <h1>初コメBIG 設定</h1>
+      <form id="settings-form">
+        <label for="theme">テーマ</label>
+        <select id="theme" name="theme">
+          <option value="light">ライト</option>
+          <option value="dark">ダーク</option>
+        </select>
+
+        <label for="comment-font-size">通常コメント文字サイズ</label>
+        <span>
+          <input
+            id="comment-font-size"
+            name="commentFontSize"
+            type="number"
+            min="16"
+            max="64"
+            step="1"
+            value="32"
+          />
+          px
+        </span>
+
+        <label for="first-comment-font-size">初コメ文字サイズ</label>
+        <span>
+          <input
+            id="first-comment-font-size"
+            name="firstCommentFontSize"
+            type="number"
+            min="24"
+            max="128"
+            step="1"
+            value="64"
+          />
+          px
+        </span>
+
+        <button id="save" type="submit">保存</button>
+        <p id="status" role="status" aria-live="polite"></p>
+      </form>
+    </main>
+
+    <script src="./settings-core.js"></script>
+    <script src="./script.js"></script>
+  </body>
+</html>

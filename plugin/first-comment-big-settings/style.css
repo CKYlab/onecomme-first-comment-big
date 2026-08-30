@@ -1,0 +1,76 @@
+:root {
+  color: #222;
+  background: #f4f4f4;
+  font-family: sans-serif;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  box-sizing: border-box;
+  width: min(100%, 32rem);
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+h1 {
+  margin: 0 0 1.5rem;
+  font-size: 1.5rem;
+}
+
+form {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  border: 1px solid #d8d8d8;
+  border-radius: 0.5rem;
+  background: #fff;
+}
+
+label {
+  margin-top: 0.5rem;
+  font-weight: 700;
+}
+
+select,
+input,
+button {
+  box-sizing: border-box;
+  min-height: 2.5rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #888;
+  border-radius: 0.25rem;
+  color: inherit;
+  background: #fff;
+  font: inherit;
+}
+
+input {
+  width: 7rem;
+}
+
+button {
+  margin-top: 1rem;
+  color: #fff;
+  background: #222;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+select:focus-visible,
+input:focus-visible,
+button:focus-visible {
+  outline: 3px solid #1876d2;
+  outline-offset: 2px;
+}
+
+#status {
+  min-height: 1.5em;
+  margin: 0;
+}
