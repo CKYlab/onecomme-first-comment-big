@@ -182,6 +182,7 @@
           connected: false,
           setup: null,
           subscriberId: null,
+          emitCommentsCallCount: 0,
           unsubscribeCallCount: 0,
           unsubscribeThrowCount: 0,
           unsubscribedId: null,
@@ -218,6 +219,7 @@
             }
           },
           emitComments: (comments) => {
+            window.__fixtureState.emitCommentsCallCount += 1
             if (callback) callback(comments)
           },
         }
@@ -761,11 +763,31 @@
             await updateFixtureSettings({ theme: 'light', commentFontSize: 32, firstCommentFontSize: 64 })
             const container = document.getElementById('comments')
             container.replaceChildren()
-            window.OneSDK.emitComments(Array.from({ length: 100 }, (_, index) => normal(`サイズ変更fit ${index + 1}`, false)))
+            window.OneSDK.emitComments([
+              ...Array.from({ length: 98 }, (_, index) => normal(`サイズ変更fit ${index + 1}`, false)),
+              normal('BIG', true),
+              normal(`サイズ変更fit 長文保持 ${'折り返し確認'.repeat(4)}`, false),
+            ])
             const beforeFitCount = container.childElementCount
+            const oldestBeforeSizeChange = container.lastElementChild.textContent
+            const emitCountBeforeSizeChange = window.__fixtureState.emitCommentsCallCount
             await updateFixtureSettings({ commentFontSize: 40, firstCommentFontSize: 80 })
             const afterFitCount = container.childElementCount
-            check('size-refit', beforeFitCount > 1 && afterFitCount < beforeFitCount, `${beforeFitCount} -> ${afterFitCount}`)
+            const retainedAfterSizeChange = Array.from(container.children)
+            const sizeRefitPass =
+              beforeFitCount > 2 &&
+              afterFitCount < beforeFitCount &&
+              !retainedAfterSizeChange.some((element) => element.textContent === oldestBeforeSizeChange) &&
+              retainedAfterSizeChange.some((element) => element.classList.contains('comment--first')) &&
+              retainedAfterSizeChange.some((element) => element.textContent.includes('長文保持')) &&
+              container.scrollHeight <= container.clientHeight &&
+              Number.isInteger(emitCountBeforeSizeChange) &&
+              window.__fixtureState.emitCommentsCallCount === emitCountBeforeSizeChange
+            check(
+              'size-refit',
+              sizeRefitPass,
+              `${beforeFitCount} -> ${afterFitCount}; BIG=${retainedAfterSizeChange.some((element) => element.classList.contains('comment--first'))}; long=${retainedAfterSizeChange.some((element) => element.textContent.includes('長文保持'))}; oldestRemoved=${!retainedAfterSizeChange.some((element) => element.textContent === oldestBeforeSizeChange)}; fit=${container.scrollHeight}/${container.clientHeight}; emits=${emitCountBeforeSizeChange}/${window.__fixtureState.emitCommentsCallCount}`,
+            )
 
             container.replaceChildren()
             emit(gift({
@@ -792,29 +814,41 @@
             const twicasGiftElement = container.querySelector('.comment--gift')
             const kickGiftElements = Array.from(container.querySelectorAll('.comment--kick-gift'))
             const twicasColors = inlineColors(twicasGiftElement)
-            const kickColors = kickGiftElements.map(inlineColors)
+            const kickGiftForAmount = (amountText) => kickGiftElements.find(
+              (element) => element.querySelector('.kick-gift__amount')?.textContent === amountText,
+            )
+            const basicKickGiftElement = kickGiftForAmount('(100)')
+            const levelUpKickGiftElement = kickGiftForAmount('(1000)')
+            const kickColorsByIdentity = {
+              BASIC_100: basicKickGiftElement ? inlineColors(basicKickGiftElement) : null,
+              LEVEL_UP_1000: levelUpKickGiftElement ? inlineColors(levelUpKickGiftElement) : null,
+            }
             const expectedTwicasColors = {
               backgroundColor: 'rgb(226, 181, 43)',
               color: 'rgb(255, 255, 255)',
             }
-            const expectedKickColors = [
-              {
-                backgroundColor: 'rgb(24, 233, 251)',
-                color: 'rgb(51, 51, 51)',
-              },
-              {
+            const expectedKickColorsByIdentity = {
+              BASIC_100: {
                 backgroundColor: 'rgb(24, 251, 176)',
                 color: 'rgb(51, 51, 51)',
               },
-            ]
+              LEVEL_UP_1000: {
+                backgroundColor: 'rgb(24, 233, 251)',
+                color: 'rgb(51, 51, 51)',
+              },
+            }
             await updateFixtureSettings({ theme: 'dark' })
             const twicasGiftColorsPass =
               JSON.stringify(twicasColors) === JSON.stringify(expectedTwicasColors) &&
               JSON.stringify(inlineColors(twicasGiftElement)) === JSON.stringify(expectedTwicasColors)
+            const kickColorsAfterThemeByIdentity = {
+              BASIC_100: basicKickGiftElement ? inlineColors(basicKickGiftElement) : null,
+              LEVEL_UP_1000: levelUpKickGiftElement ? inlineColors(levelUpKickGiftElement) : null,
+            }
             const kickGiftColorsPass =
               kickGiftElements.length === 2 &&
-              JSON.stringify(kickColors) === JSON.stringify(expectedKickColors) &&
-              JSON.stringify(kickGiftElements.map(inlineColors)) === JSON.stringify(expectedKickColors)
+              JSON.stringify(kickColorsByIdentity) === JSON.stringify(expectedKickColorsByIdentity) &&
+              JSON.stringify(kickColorsAfterThemeByIdentity) === JSON.stringify(expectedKickColorsByIdentity)
             recordSettingsResult(
               'twicas-gift-colors',
               twicasGiftColorsPass,
@@ -823,7 +857,7 @@
             recordSettingsResult(
               'kick-gift-colors',
               kickGiftColorsPass,
-              JSON.stringify(kickColors),
+              JSON.stringify(kickColorsByIdentity),
             )
             if (!twicasGiftColorsPass || !kickGiftColorsPass) {
               throw new Error('gift-colors: explicit inline colors or theme persistence failed')
