@@ -57,6 +57,18 @@
     const firstCommentFontSize = elements['first-comment-font-size']
     const saveButton = elements.save
     const status = elements.status
+    let pendingRequestCount = 0
+    let saveGeneration = 0
+
+    function beginRequest() {
+      pendingRequestCount += 1
+      saveButton.disabled = true
+    }
+
+    function finishRequest() {
+      pendingRequestCount -= 1
+      saveButton.disabled = pendingRequestCount > 0
+    }
 
     function applySettings(value) {
       const normalized = settingsCore.normalizeSettings(value)
@@ -66,20 +78,29 @@
     }
 
     async function load() {
+      const startingSaveGeneration = saveGeneration
+      beginRequest()
       try {
         const response = await fetchImpl(endpoint, { method: 'GET' })
         if (!response || !response.ok) throw new Error('GET settings failed')
-        applySettings(await response.json())
+        const responseSettings = await response.json()
+        if (startingSaveGeneration !== saveGeneration) return
+        applySettings(responseSettings)
         status.textContent = ''
       } catch {
+        if (startingSaveGeneration !== saveGeneration) return
         applySettings(settingsCore.DEFAULT_SETTINGS)
         status.textContent = '設定を取得できませんでした。'
+      } finally {
+        finishRequest()
       }
     }
 
     async function save(event) {
       if (event && typeof event.preventDefault === 'function') event.preventDefault()
-      saveButton.disabled = true
+      saveGeneration += 1
+      const currentSaveGeneration = saveGeneration
+      beginRequest()
       try {
         const settings = settingsCore.normalizeSettings({
           theme: theme.value,
@@ -92,12 +113,15 @@
           body: JSON.stringify(settings),
         })
         if (!response || !response.ok) throw new Error('PUT settings failed')
-        applySettings(await response.json())
+        const responseSettings = await response.json()
+        if (currentSaveGeneration !== saveGeneration) return
+        applySettings(responseSettings)
         status.textContent = '保存しました。'
       } catch {
+        if (currentSaveGeneration !== saveGeneration) return
         status.textContent = '設定を保存できませんでした。'
       } finally {
-        saveButton.disabled = false
+        finishRequest()
       }
     }
 
