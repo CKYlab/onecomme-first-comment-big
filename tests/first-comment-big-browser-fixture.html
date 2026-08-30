@@ -183,6 +183,7 @@
           setup: null,
           subscriberId: null,
           unsubscribeCallCount: 0,
+          unsubscribeThrowCount: 0,
           unsubscribedId: null,
           throwOnUnsubscribe: false,
         }
@@ -212,6 +213,7 @@
             document.documentElement.dataset.unsubscribedId = id
             callback = null
             if (window.__fixtureState.throwOnUnsubscribe) {
+              window.__fixtureState.unsubscribeThrowCount += 1
               throw new Error('fixture OneSDK unsubscribe failure')
             }
           },
@@ -652,6 +654,7 @@
           ['owner-render', 'TwitCasting/Kick owner'],
           ['prepend-order', '新着が上、最古が下から削除'],
           ['failure-continuity', 'API失敗後もコメント追加可能'],
+          ['ordinary-cleanup', '通常pagehideでGET停止・unsubscribe済み'],
           ['stop-exception', 'stop例外時もunsubscribe済み'],
           ['unsubscribe-exception', 'unsubscribe例外時もGET停止'],
         ]
@@ -790,18 +793,41 @@
             const kickGiftElements = Array.from(container.querySelectorAll('.comment--kick-gift'))
             const twicasColors = inlineColors(twicasGiftElement)
             const kickColors = kickGiftElements.map(inlineColors)
+            const expectedTwicasColors = {
+              backgroundColor: 'rgb(226, 181, 43)',
+              color: 'rgb(255, 255, 255)',
+            }
+            const expectedKickColors = [
+              {
+                backgroundColor: 'rgb(24, 233, 251)',
+                color: 'rgb(51, 51, 51)',
+              },
+              {
+                backgroundColor: 'rgb(24, 251, 176)',
+                color: 'rgb(51, 51, 51)',
+              },
+            ]
             await updateFixtureSettings({ theme: 'dark' })
-            check(
+            const twicasGiftColorsPass =
+              JSON.stringify(twicasColors) === JSON.stringify(expectedTwicasColors) &&
+              JSON.stringify(inlineColors(twicasGiftElement)) === JSON.stringify(expectedTwicasColors)
+            const kickGiftColorsPass =
+              kickGiftElements.length === 2 &&
+              JSON.stringify(kickColors) === JSON.stringify(expectedKickColors) &&
+              JSON.stringify(kickGiftElements.map(inlineColors)) === JSON.stringify(expectedKickColors)
+            recordSettingsResult(
               'twicas-gift-colors',
-              JSON.stringify(inlineColors(twicasGiftElement)) === JSON.stringify(twicasColors),
+              twicasGiftColorsPass,
               JSON.stringify(twicasColors),
             )
-            check(
+            recordSettingsResult(
               'kick-gift-colors',
-              kickGiftElements.length === 2 &&
-                JSON.stringify(kickGiftElements.map(inlineColors)) === JSON.stringify(kickColors),
+              kickGiftColorsPass,
               JSON.stringify(kickColors),
             )
+            if (!twicasGiftColorsPass || !kickGiftColorsPass) {
+              throw new Error('gift-colors: explicit inline colors or theme persistence failed')
+            }
 
             container.replaceChildren()
             emit(normal('設定回帰 通常コメント', false))
@@ -844,6 +870,8 @@
             )
             api.fail = false
 
+            const ordinaryCleanup = await runCleanupScenario('ordinary-cleanup')
+            check('ordinary-cleanup', ordinaryCleanup.pass, ordinaryCleanup.detail)
             const stopException = await runCleanupScenario('stop-exception')
             check('stop-exception', stopException.pass, stopException.detail)
             const unsubscribeException = await runCleanupScenario('unsubscribe-exception')
@@ -886,20 +914,38 @@
             const api = window.__fixtureSettingsApi
             if (cleanupScenario === 'stop-exception') api.throwAfterStop = true
             if (cleanupScenario === 'unsubscribe-exception') window.__fixtureState.throwOnUnsubscribe = true
+            const subscriberReadyBeforeDispose =
+              window.__fixtureState.subscriberId === 'fixture-subscriber'
             const getCountBeforeDispose = api.getCount
             window.dispatchEvent(new Event('pagehide'))
             const getCountAfterDispose = api.getCount
             await waitForSettingsTick()
-            const pass = cleanupScenario === 'stop-exception'
-              ? window.__fixtureState.unsubscribedId === 'fixture-subscriber' &&
+            const cleanupCommonPass =
+              subscriberReadyBeforeDispose &&
+              getCountBeforeDispose > 0 &&
+              api.stopCallCount === 1 &&
+              api.getCount === getCountAfterDispose
+            let pass = false
+            if (cleanupScenario === 'ordinary-cleanup') {
+              pass = cleanupCommonPass &&
                 window.__fixtureState.unsubscribeCallCount === 1 &&
-                api.stopCallCount > 0 &&
-                api.getCount === getCountAfterDispose
-              : api.stopCallCount > 0 && api.getCount === getCountAfterDispose
+                window.__fixtureState.unsubscribedId === 'fixture-subscriber' &&
+                window.__fixtureState.throwOnUnsubscribe === false &&
+                api.throwAfterStop === false
+            } else if (cleanupScenario === 'stop-exception') {
+              pass = cleanupCommonPass &&
+                window.__fixtureState.unsubscribeCallCount === 1 &&
+                window.__fixtureState.unsubscribedId === 'fixture-subscriber'
+            } else if (cleanupScenario === 'unsubscribe-exception') {
+              pass = cleanupCommonPass &&
+                window.__fixtureState.unsubscribeCallCount === 1 &&
+                window.__fixtureState.unsubscribeThrowCount === 1 &&
+                window.__fixtureState.unsubscribedId === 'fixture-subscriber'
+            }
             window.parent.postMessage({
               fixtureCleanupScenario: cleanupScenario,
               pass,
-              detail: `${getCountBeforeDispose} / ${getCountAfterDispose} / ${api.getCount}`,
+              detail: `ready=${subscriberReadyBeforeDispose}; GET=${getCountBeforeDispose}/${getCountAfterDispose}/${api.getCount}; stop=${api.stopCallCount}; unsubscribe=${window.__fixtureState.unsubscribeCallCount}; id=${window.__fixtureState.unsubscribedId}; threw=${window.__fixtureState.unsubscribeThrowCount || 0}`,
             }, window.location.origin)
           })()
         }
