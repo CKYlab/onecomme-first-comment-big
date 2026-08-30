@@ -20,6 +20,8 @@
         color: #fff;
         font: 14px/1.4 system-ui, sans-serif;
         pointer-events: auto;
+        max-height: min(42vh, 320px);
+        overflow-y: auto;
       }
 
       .fixture-controls p {
@@ -29,6 +31,20 @@
 
       .fixture-controls button {
         padding: 6px 10px;
+      }
+
+      .fixture-settings-results {
+        flex-basis: 100%;
+        margin: 0;
+        padding-left: 24px;
+      }
+
+      .fixture-settings-results [data-status='pass'] {
+        color: #86efac;
+      }
+
+      .fixture-settings-results [data-status='fail'] {
+        color: #fca5a5;
       }
 
       body {
@@ -85,12 +101,66 @@
       <button id="emit-html-tags" type="button">HTML安全性</button>
       <button id="emit-viewport-sequence" type="button">表示領域テスト</button>
       <button id="dispose" type="button">Pagehide</button>
+      <p><strong>設定fixture:</strong> production設定クライアントを実APIなしで検証します。</p>
+      <button id="settings-light" type="button">light</button>
+      <button id="settings-dark" type="button">dark</button>
+      <button id="settings-normal-40" type="button">通常40px</button>
+      <button id="settings-big-80" type="button">BIG80px</button>
+      <button id="settings-same" type="button">同一設定</button>
+      <button id="settings-fail" type="button">API失敗</button>
+      <button id="run-settings-checks" type="button">設定fixture検証</button>
+      <ol id="settings-check-results" class="fixture-settings-results" aria-live="polite"></ol>
     </aside>
 
     <main id="comments" aria-live="polite" aria-label="初コメBIG表示領域"></main>
 
     <script>
       ;(() => {
+        const settingsEndpoint = 'http://localhost:11180/api/plugins/com.ckylab.first-comment-big-settings'
+        const originalFetch = window.fetch.bind(window)
+        const settingsVariables = new Set([
+          '--panel-background',
+          '--comment-text-color',
+          '--comment-border-color',
+          '--comment-font-size',
+          '--first-comment-font-size',
+        ])
+        const originalSetProperty = CSSStyleDeclaration.prototype.setProperty
+        window.__fixtureSettingsMetrics = {
+          setPropertyCount: 0,
+          setPropertyCounts: Object.fromEntries(Array.from(settingsVariables, (name) => [name, 0])),
+        }
+        CSSStyleDeclaration.prototype.setProperty = function setProperty(name, value, priority) {
+          if (settingsVariables.has(name)) {
+            window.__fixtureSettingsMetrics.setPropertyCount += 1
+            window.__fixtureSettingsMetrics.setPropertyCounts[name] += 1
+          }
+          return originalSetProperty.call(this, name, value, priority)
+        }
+
+        window.__fixtureSettingsApi = {
+          settings: { theme: 'light', commentFontSize: 32, firstCommentFontSize: 64 },
+          fail: false,
+          getCount: 0,
+          stopCallCount: 0,
+          throwAfterStop: false,
+          set(next) {
+            this.settings = structuredClone(next)
+          },
+        }
+        window.fetch = (input, ...args) => {
+          const url = input instanceof Request ? input.url : String(input)
+          if (url !== settingsEndpoint) return originalFetch(input, ...args)
+          window.__fixtureSettingsApi.getCount += 1
+          if (window.__fixtureSettingsApi.fail) {
+            return Promise.reject(new Error('fixture settings API failure'))
+          }
+          return Promise.resolve({
+            ok: true,
+            json: async () => structuredClone(window.__fixtureSettingsApi.settings),
+          })
+        }
+
         const storageKey = 'onecomme.first-comment-big.anonymous-history.v1'
         localStorage.setItem(
           storageKey,
@@ -112,7 +182,9 @@
           connected: false,
           setup: null,
           subscriberId: null,
+          unsubscribeCallCount: 0,
           unsubscribedId: null,
+          throwOnUnsubscribe: false,
         }
         window.OneSDK = {
           PERM: { COMMENT: 'comment' },
@@ -135,9 +207,13 @@
             document.documentElement.dataset.connected = 'true'
           },
           unsubscribe: (id) => {
+            window.__fixtureState.unsubscribeCallCount += 1
             window.__fixtureState.unsubscribedId = id
             document.documentElement.dataset.unsubscribedId = id
             callback = null
+            if (window.__fixtureState.throwOnUnsubscribe) {
+              throw new Error('fixture OneSDK unsubscribe failure')
+            }
           },
           emitComments: (comments) => {
             if (callback) callback(comments)
@@ -149,6 +225,28 @@
     <script src="../template/first-comment-big/gift-presentation.js"></script>
     <script src="../template/first-comment-big/kick-gift-presentation.js"></script>
     <script src="../template/first-comment-big/kick-emote-presentation.js"></script>
+    <script src="../template/first-comment-big/settings-client.js"></script>
+    <script>
+      ;(() => {
+        const productionSettingsClient = window.FirstCommentBigSettingsClient
+        window.FirstCommentBigSettingsClient = Object.freeze({
+          ...productionSettingsClient,
+          createSettingsClient(options) {
+            const controller = productionSettingsClient.createSettingsClient(options)
+            return Object.freeze({
+              start: controller.start,
+              stop() {
+                window.__fixtureSettingsApi.stopCallCount += 1
+                controller.stop()
+                if (window.__fixtureSettingsApi.throwAfterStop) {
+                  throw new Error('fixture settings stop failure')
+                }
+              },
+            })
+          },
+        })
+      })()
+    </script>
     <script src="../template/first-comment-big/script.js"></script>
     <script>
       ;(() => {
@@ -538,6 +636,273 @@
               rendered.some((element) => element.textContent.includes('長文')),
           )
         })
+
+        const settingsChecks = [
+          ['initial', 'light / 32 / 64'],
+          ['dark', 'dark反映'],
+          ['normal-size', '通常文字サイズ変更'],
+          ['big-size', 'BIG文字サイズ変更'],
+          ['same-settings', '同一設定で再適用なし'],
+          ['size-refit', 'size変更後fit'],
+          ['twicas-gift-colors', 'TwitCasting gift色維持'],
+          ['kick-gift-colors', 'Kick gift色維持'],
+          ['normal-render', '通常コメント'],
+          ['first-render', '初コメBIG'],
+          ['kick-emote-render', 'Kickエモート'],
+          ['owner-render', 'TwitCasting/Kick owner'],
+          ['prepend-order', '新着が上、最古が下から削除'],
+          ['failure-continuity', 'API失敗後もコメント追加可能'],
+          ['stop-exception', 'stop例外時もunsubscribe済み'],
+          ['unsubscribe-exception', 'unsubscribe例外時もGET停止'],
+        ]
+        const results = document.getElementById('settings-check-results')
+        const waitForSettingsTick = () => new Promise((resolve) => setTimeout(resolve, 600))
+        const cssVariable = (name) => getComputedStyle(document.documentElement)
+          .getPropertyValue(name)
+          .trim()
+        const resetSettingsResults = () => {
+          results.replaceChildren(...settingsChecks.map(([key, label]) => {
+            const item = document.createElement('li')
+            item.dataset.check = key
+            item.dataset.status = 'pending'
+            item.textContent = `${label}: 未実行`
+            return item
+          }))
+        }
+        const recordSettingsResult = (key, pass, detail = '') => {
+          const item = results.querySelector(`[data-check="${key}"]`)
+          if (!item) return
+          item.dataset.status = pass ? 'pass' : 'fail'
+          item.textContent = `${settingsChecks.find(([nextKey]) => nextKey === key)[1]}: ${pass ? 'PASS' : 'FAIL'}${detail ? ` (${detail})` : ''}`
+        }
+        const check = (key, pass, detail = '') => {
+          recordSettingsResult(key, Boolean(pass), detail)
+          if (!pass) throw new Error(`${key}: ${detail || 'assertion failed'}`)
+        }
+        const updateFixtureSettings = async (patch) => {
+          const api = window.__fixtureSettingsApi
+          api.fail = false
+          api.set({ ...api.settings, ...patch })
+          await waitForSettingsTick()
+        }
+        const inlineColors = (element) => ({
+          backgroundColor: element.style.backgroundColor,
+          color: element.style.color,
+        })
+        const runCleanupScenario = (scenario) => new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            window.removeEventListener('message', onMessage)
+            iframe.remove()
+            reject(new Error(`${scenario} cleanup fixture timed out`))
+          }, 4000)
+          const onMessage = (event) => {
+            if (
+              event.origin !== window.location.origin ||
+              !event.data ||
+              event.data.fixtureCleanupScenario !== scenario
+            ) return
+            clearTimeout(timeout)
+            window.removeEventListener('message', onMessage)
+            iframe.remove()
+            resolve(event.data)
+          }
+          window.addEventListener('message', onMessage)
+          const iframe = document.createElement('iframe')
+          iframe.hidden = true
+          const url = new URL(window.location.href)
+          url.search = `?fixtureCleanup=${encodeURIComponent(scenario)}`
+          iframe.src = url.href
+          document.body.append(iframe)
+        })
+        const runSettingsChecks = async () => {
+          resetSettingsResults()
+          document.documentElement.dataset.settingsChecksPass = 'running'
+          const button = document.getElementById('run-settings-checks')
+          button.disabled = true
+
+          try {
+            const api = window.__fixtureSettingsApi
+            api.fail = false
+            api.set({ theme: 'light', commentFontSize: 32, firstCommentFontSize: 64 })
+            await waitForSettingsTick()
+            check(
+              'initial',
+              cssVariable('--panel-background') === '#ffffff' &&
+                cssVariable('--comment-font-size') === '32px' &&
+                cssVariable('--first-comment-font-size') === '64px',
+              `${cssVariable('--panel-background')} / ${cssVariable('--comment-font-size')} / ${cssVariable('--first-comment-font-size')}`,
+            )
+
+            await updateFixtureSettings({ theme: 'dark' })
+            check(
+              'dark',
+              cssVariable('--panel-background') === '#0b0b0b' &&
+                cssVariable('--comment-text-color') === '#ffffff' &&
+                cssVariable('--comment-border-color') === '#333333',
+              `${cssVariable('--panel-background')} / ${cssVariable('--comment-text-color')} / ${cssVariable('--comment-border-color')}`,
+            )
+
+            await updateFixtureSettings({ commentFontSize: 40 })
+            check('normal-size', cssVariable('--comment-font-size') === '40px', cssVariable('--comment-font-size'))
+            await updateFixtureSettings({ firstCommentFontSize: 80 })
+            check('big-size', cssVariable('--first-comment-font-size') === '80px', cssVariable('--first-comment-font-size'))
+
+            const setPropertyCount = window.__fixtureSettingsMetrics.setPropertyCount
+            await updateFixtureSettings({})
+            check(
+              'same-settings',
+              window.__fixtureSettingsMetrics.setPropertyCount === setPropertyCount,
+              `${setPropertyCount} -> ${window.__fixtureSettingsMetrics.setPropertyCount}`,
+            )
+
+            await updateFixtureSettings({ theme: 'light', commentFontSize: 32, firstCommentFontSize: 64 })
+            const container = document.getElementById('comments')
+            container.replaceChildren()
+            window.OneSDK.emitComments(Array.from({ length: 100 }, (_, index) => normal(`サイズ変更fit ${index + 1}`, false)))
+            const beforeFitCount = container.childElementCount
+            await updateFixtureSettings({ commentFontSize: 40, firstCommentFontSize: 80 })
+            const afterFitCount = container.childElementCount
+            check('size-refit', beforeFitCount > 1 && afterFitCount < beforeFitCount, `${beforeFitCount} -> ${afterFitCount}`)
+
+            container.replaceChildren()
+            emit(gift({
+              itemName: '設定色Twicas',
+              speechText: '設定色Twicas 設定色Twicas',
+              isFreeGift: false,
+              price: 100,
+              backgroundColor: '#e2b52b',
+              textColor: '#ffffff',
+            }))
+            emit(kickGift({
+              amount: 100,
+              backgroundColor: '#18fbb0',
+              textColor: '#333333',
+              includeAnimated: false,
+              giftId: 'full_send',
+              giftName: 'Full Send',
+              type: 'BASIC',
+              tier: 'BASIC',
+              characterLimit: 0,
+              pinnedTime: 0,
+            }))
+            emit(kickGift({ amount: 1000, backgroundColor: '#18e9fb' }))
+            const twicasGiftElement = container.querySelector('.comment--gift')
+            const kickGiftElements = Array.from(container.querySelectorAll('.comment--kick-gift'))
+            const twicasColors = inlineColors(twicasGiftElement)
+            const kickColors = kickGiftElements.map(inlineColors)
+            await updateFixtureSettings({ theme: 'dark' })
+            check(
+              'twicas-gift-colors',
+              JSON.stringify(inlineColors(twicasGiftElement)) === JSON.stringify(twicasColors),
+              JSON.stringify(twicasColors),
+            )
+            check(
+              'kick-gift-colors',
+              kickGiftElements.length === 2 &&
+                JSON.stringify(kickGiftElements.map(inlineColors)) === JSON.stringify(kickColors),
+              JSON.stringify(kickColors),
+            )
+
+            container.replaceChildren()
+            emit(normal('設定回帰 通常コメント', false))
+            check('normal-render', container.firstElementChild.textContent === '設定回帰 通常コメント' && !container.firstElementChild.classList.contains('comment--first'))
+            emit(normal('設定回帰 初コメBIG', true))
+            check('first-render', container.firstElementChild.classList.contains('comment--first') && getComputedStyle(container.firstElementChild).fontSize === '80px')
+            document.getElementById('emit-kick-emote').click()
+            check('kick-emote-render', Boolean(container.firstElementChild.querySelector('.kick-emote')))
+            document.getElementById('emit-twicas-owner-first').click()
+            const twicasOwnerElement = container.firstElementChild
+            document.getElementById('emit-kick-owner-emote').click()
+            check(
+              'owner-render',
+              twicasOwnerElement.classList.contains('comment--owner') &&
+                container.firstElementChild.classList.contains('comment--owner'),
+            )
+
+            container.replaceChildren()
+            window.OneSDK.emitComments(Array.from({ length: 105 }, (_, index) => normal(`順序${index + 1}`, false)))
+            check(
+              'prepend-order',
+              container.firstElementChild.textContent === '順序105' &&
+                container.lastElementChild.textContent !== '順序1' &&
+                container.childElementCount < 105,
+              `${container.firstElementChild.textContent} / ${container.lastElementChild.textContent} / ${container.childElementCount}`,
+            )
+
+            await updateFixtureSettings({ theme: 'dark', commentFontSize: 40, firstCommentFontSize: 80 })
+            api.fail = true
+            await waitForSettingsTick()
+            const defaultedAfterFailure =
+              cssVariable('--panel-background') === '#ffffff' &&
+              cssVariable('--comment-font-size') === '32px' &&
+              cssVariable('--first-comment-font-size') === '64px'
+            emit(normal('API失敗後の通常コメント', false))
+            check(
+              'failure-continuity',
+              defaultedAfterFailure && container.firstElementChild.textContent === 'API失敗後の通常コメント',
+              `${cssVariable('--panel-background')} / ${cssVariable('--comment-font-size')} / ${cssVariable('--first-comment-font-size')}`,
+            )
+            api.fail = false
+
+            const stopException = await runCleanupScenario('stop-exception')
+            check('stop-exception', stopException.pass, stopException.detail)
+            const unsubscribeException = await runCleanupScenario('unsubscribe-exception')
+            check('unsubscribe-exception', unsubscribeException.pass, unsubscribeException.detail)
+
+            document.documentElement.dataset.settingsChecksPass = 'true'
+          } catch (error) {
+            document.documentElement.dataset.settingsChecksPass = 'false'
+            const firstPending = results.querySelector('[data-status="pending"]')
+            if (firstPending) {
+              firstPending.dataset.status = 'fail'
+              firstPending.textContent = `${firstPending.textContent.replace(': 未実行', '')}: FAIL (${error.message})`
+            }
+            console.error('[fixture] 設定fixture検証に失敗しました。', error)
+          } finally {
+            button.disabled = false
+          }
+        }
+
+        resetSettingsResults()
+        document.getElementById('settings-light').addEventListener('click', () => updateFixtureSettings({ theme: 'light' }))
+        document.getElementById('settings-dark').addEventListener('click', () => updateFixtureSettings({ theme: 'dark' }))
+        document.getElementById('settings-normal-40').addEventListener('click', () => updateFixtureSettings({ commentFontSize: 40 }))
+        document.getElementById('settings-big-80').addEventListener('click', () => updateFixtureSettings({ firstCommentFontSize: 80 }))
+        document.getElementById('settings-same').addEventListener('click', async () => {
+          const before = window.__fixtureSettingsMetrics.setPropertyCount
+          await updateFixtureSettings({})
+          recordSettingsResult('same-settings', before === window.__fixtureSettingsMetrics.setPropertyCount, `${before} -> ${window.__fixtureSettingsMetrics.setPropertyCount}`)
+        })
+        document.getElementById('settings-fail').addEventListener('click', async () => {
+          window.__fixtureSettingsApi.fail = true
+          await waitForSettingsTick()
+        })
+        document.getElementById('run-settings-checks').addEventListener('click', runSettingsChecks)
+
+        const cleanupScenario = new URLSearchParams(window.location.search).get('fixtureCleanup')
+        if (cleanupScenario) {
+          ;(async () => {
+            await waitForSettingsTick()
+            const api = window.__fixtureSettingsApi
+            if (cleanupScenario === 'stop-exception') api.throwAfterStop = true
+            if (cleanupScenario === 'unsubscribe-exception') window.__fixtureState.throwOnUnsubscribe = true
+            const getCountBeforeDispose = api.getCount
+            window.dispatchEvent(new Event('pagehide'))
+            const getCountAfterDispose = api.getCount
+            await waitForSettingsTick()
+            const pass = cleanupScenario === 'stop-exception'
+              ? window.__fixtureState.unsubscribedId === 'fixture-subscriber' &&
+                window.__fixtureState.unsubscribeCallCount === 1 &&
+                api.stopCallCount > 0 &&
+                api.getCount === getCountAfterDispose
+              : api.stopCallCount > 0 && api.getCount === getCountAfterDispose
+            window.parent.postMessage({
+              fixtureCleanupScenario: cleanupScenario,
+              pass,
+              detail: `${getCountBeforeDispose} / ${getCountAfterDispose} / ${api.getCount}`,
+            }, window.location.origin)
+          })()
+        }
         document.getElementById('dispose').addEventListener('click', () => window.dispatchEvent(new Event('pagehide')))
       })()
     </script>
