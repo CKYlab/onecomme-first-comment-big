@@ -1,8 +1,16 @@
 'use strict'
 
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
 const test = require('node:test')
+const vm = require('node:vm')
 const clientModule = require('../template/first-comment-big/settings-client.js')
+
+const LIVE_TEMPLATE_SCRIPT = fs.readFileSync(
+  path.join(__dirname, '../template/first-comment-big/script.js'),
+  'utf8',
+)
 
 const DEFAULT_SETTINGS = {
   theme: 'light',
@@ -28,6 +36,117 @@ function deferred() {
     reject = rejectPromise
   })
   return { promise, resolve, reject }
+}
+
+function flushAsyncWork() {
+  return new Promise((resolve) => setImmediate(resolve))
+}
+
+function makeLiveTemplateHarness({
+  settingsStart,
+  settingsStop,
+  oneSDKReady,
+  oneSDKUnsubscribe,
+} = {}) {
+  const pagehideListeners = new Set()
+  const warnings = []
+  const calls = {
+    connect: 0,
+    createSettingsClient: [],
+    settingsStart: 0,
+    settingsStop: 0,
+    unsubscribe: 0,
+  }
+  const rootElement = {}
+  const container = {
+    childElementCount: 0,
+    clientHeight: 0,
+    lastElementChild: null,
+    prepend() {},
+    scrollHeight: 0,
+    scrollTop: 0,
+  }
+  const document = {
+    body: { removeAttribute() {} },
+    documentElement: rootElement,
+    getElementById(id) {
+      return id === 'comments' ? container : null
+    },
+  }
+  const window = {
+    FirstCommentBigCore: {
+      createAnonymousHistory() {
+        return {}
+      },
+      createDisplayModel() {
+        return null
+      },
+      decodeHtmlEntitiesOnce(value) {
+        return value
+      },
+    },
+    FirstCommentGiftPresentation: { createGiftPresentation() { return null } },
+    FirstCommentKickGiftPresentation: { createKickGiftPresentation() { return null } },
+    FirstCommentKickEmotePresentation: {
+      buildKickEmoteUrl() { return null },
+      createKickPresentation() { return null },
+    },
+    FirstCommentBigSettingsClient: {
+      createSettingsClient(options) {
+        calls.createSettingsClient.push(options)
+        return {
+          start() {
+            calls.settingsStart += 1
+            return settingsStart ? settingsStart() : Promise.resolve()
+          },
+          stop() {
+            calls.settingsStop += 1
+            if (settingsStop) return settingsStop()
+          },
+        }
+      },
+    },
+    OneSDK: {
+      ready() {
+        return oneSDKReady ? oneSDKReady() : Promise.resolve()
+      },
+      async setup() {},
+      subscribe() {
+        return 'subscriber-id'
+      },
+      async connect() {
+        calls.connect += 1
+      },
+      unsubscribe() {
+        calls.unsubscribe += 1
+        if (oneSDKUnsubscribe) return oneSDKUnsubscribe()
+      },
+    },
+    addEventListener(type, listener) {
+      if (type === 'pagehide') pagehideListeners.add(listener)
+    },
+    removeEventListener(type, listener) {
+      if (type === 'pagehide') pagehideListeners.delete(listener)
+    },
+  }
+  const context = vm.createContext({
+    Promise,
+    console: { error() {}, warn(...args) { warnings.push(args) } },
+    document,
+    window,
+  })
+
+  return {
+    calls,
+    rootElement,
+    warnings,
+    emitPagehide() {
+      for (const listener of pagehideListeners) listener()
+    },
+    run() {
+      vm.runInContext(LIVE_TEMPLATE_SCRIPT, context)
+    },
+  }
 }
 
 function makeHarness(queue = []) {
@@ -380,4 +499,72 @@ test('開始前のstopと重複stopは例外にせず、その後startしても�
   assert.equal(harness.intervals.length, 0)
   assert.equal(harness.fetchCalls.length, 0)
   assert.deepEqual(harness.cleared, [])
+})
+
+test('ライブテンプレートはOneSDKの初期化を待たず設定クライアントへ表示要素とfit関数を渡して開始する', async () => {
+  const ready = deferred()
+  const harness = makeLiveTemplateHarness({
+    oneSDKReady() {
+      return ready.promise
+    },
+  })
+  harness.run()
+
+  assert.equal(harness.calls.createSettingsClient.length, 1)
+  assert.equal(harness.calls.settingsStart, 1)
+  assert.deepEqual(
+    Object.keys(harness.calls.createSettingsClient[0]).sort(),
+    ['fitCommentsToViewport', 'rootElement'],
+  )
+  assert.equal(harness.calls.createSettingsClient[0].rootElement, harness.rootElement)
+  assert.equal(typeof harness.calls.createSettingsClient[0].fitCommentsToViewport, 'function')
+  assert.equal(harness.calls.connect, 0)
+
+  ready.resolve()
+  await flushAsyncWork()
+  await flushAsyncWork()
+  assert.equal(harness.calls.connect, 1)
+})
+
+test('ライブテンプレートは予期しない設定開始のrejectを警告へ収容しOneSDK接続を継続する', async () => {
+  const unexpectedFailure = new Error('unexpected settings start failure')
+  const harness = makeLiveTemplateHarness({
+    settingsStart() {
+      return Promise.reject(unexpectedFailure)
+    },
+  })
+  const unhandledRejections = []
+  const onUnhandledRejection = (error) => {
+    if (error === unexpectedFailure) unhandledRejections.push(error)
+  }
+  process.on('unhandledRejection', onUnhandledRejection)
+
+  try {
+    harness.run()
+    await flushAsyncWork()
+    await flushAsyncWork()
+
+    assert.equal(harness.calls.connect, 1)
+    assert.equal(harness.warnings.length, 1)
+    assert.equal(harness.warnings[0][1], unexpectedFailure)
+    assert.deepEqual(unhandledRejections, [])
+  } finally {
+    process.off('unhandledRejection', onUnhandledRejection)
+  }
+})
+
+test('ライブテンプレートは設定停止とOneSDK購読解除をpagehideで互いの失敗から隔離する', async () => {
+  for (const { settingsStop, oneSDKUnsubscribe } of [
+    { settingsStop() { throw new Error('settings stop failure') } },
+    { oneSDKUnsubscribe() { throw new Error('unsubscribe failure') } },
+  ]) {
+    const harness = makeLiveTemplateHarness({ settingsStop, oneSDKUnsubscribe })
+    harness.run()
+    await flushAsyncWork()
+
+    harness.emitPagehide()
+
+    assert.equal(harness.calls.settingsStop, 1)
+    assert.equal(harness.calls.unsubscribe, 1)
+  }
 })

@@ -6,11 +6,13 @@
   const giftPresentation = window.FirstCommentGiftPresentation
   const kickGiftPresentation = window.FirstCommentKickGiftPresentation
   const kickEmotePresentation = window.FirstCommentKickEmotePresentation
+  const settingsClientFactory = window.FirstCommentBigSettingsClient
   const OneSDK = window.OneSDK
   const container = document.getElementById('comments')
 
   let disposed = false
   let subscriberId = null
+  let settingsClient = null
 
   function warnStorage(message, error) {
     console.warn(message, error)
@@ -48,6 +50,36 @@
       container.lastElementChild.remove()
     }
     container.scrollTop = 0
+  }
+
+  function startSettingsClient() {
+    if (
+      !settingsClientFactory ||
+      typeof settingsClientFactory.createSettingsClient !== 'function'
+    ) {
+      console.warn(
+        '[初コメBIG] 設定クライアントを読み込めないため既定表示を使用します。',
+      )
+      return
+    }
+
+    try {
+      settingsClient = settingsClientFactory.createSettingsClient({
+        rootElement: document.documentElement,
+        fitCommentsToViewport,
+      })
+      void settingsClient.start().catch((error) => {
+        console.warn(
+          '[初コメBIG] 設定機能を開始できないため既定表示を使用します。',
+          error,
+        )
+      })
+    } catch (error) {
+      console.warn(
+        '[初コメBIG] 設定機能を開始できないため既定表示を使用します。',
+        error,
+      )
+    }
   }
 
   function appendKickContent(element, presentation) {
@@ -213,6 +245,14 @@
     disposed = true
     window.removeEventListener('pagehide', dispose)
 
+    if (settingsClient && typeof settingsClient.stop === 'function') {
+      try {
+        settingsClient.stop()
+      } catch (error) {
+        console.warn('[初コメBIG] 設定機能の停止に失敗しました。', error)
+      }
+    }
+
     if (
       subscriberId !== null &&
       OneSDK &&
@@ -267,6 +307,7 @@
   }
 
   window.addEventListener('pagehide', dispose)
+  startSettingsClient()
   initialize().catch((error) => {
     console.error('[初コメBIG] OneSDKの初期化に失敗しました。', error)
     document.body.removeAttribute('hidden')
