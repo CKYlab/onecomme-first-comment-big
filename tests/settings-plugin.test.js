@@ -124,6 +124,26 @@ test('PUTがJSON解析と項目別正規化を行い完全設定を保存して�
   assert.equal(store.writes(), 1)
 })
 
+test('plain ObjectのPUTを受理し同一設定ではstore setterを増やさない', async () => {
+  const store = makeStore({ ...defaults })
+  const plugin = loadPlugin()
+  plugin.init({ store })
+  const body = { theme: 'dark', commentFontSize: 40, firstCommentFontSize: 80 }
+  const expected = { theme: 'dark', commentFontSize: 40, firstCommentFontSize: 80 }
+
+  const firstResult = await plugin.request({ method: 'PUT', body })
+
+  assert.deepEqual(firstResult, { code: 200, response: expected })
+  assert.deepEqual(store.snapshot(), expected)
+  assert.equal(store.writes(), 1)
+
+  const secondResult = await plugin.request({ method: 'PUT', body })
+
+  assert.deepEqual(secondResult, { code: 200, response: expected })
+  assert.deepEqual(store.snapshot(), expected)
+  assert.equal(store.writes(), 1)
+})
+
 test('同一設定のPUTがstore setterを増やさない', async () => {
   const store = makeStore({ theme: 'dark', commentFontSize: 40, firstCommentFontSize: 80 })
   const plugin = loadPlugin()

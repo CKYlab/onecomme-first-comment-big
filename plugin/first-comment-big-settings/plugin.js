@@ -45,11 +45,13 @@ const plugin = {
       return { code: 200, response: normalized }
     }
     if (req.method === 'PUT') {
-      let parsed
-      try {
-        parsed = JSON.parse(req.body)
-      } catch {
-        return { code: 400, response: { message: 'Invalid JSON' } }
+      let parsed = req.body
+      if (typeof req.body === 'string') {
+        try {
+          parsed = JSON.parse(req.body)
+        } catch {
+          return { code: 400, response: { message: 'Invalid JSON' } }
+        }
       }
       const normalized = normalizeSettings(parsed)
       persistIfChanged(this, normalized)
