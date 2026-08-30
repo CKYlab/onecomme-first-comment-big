@@ -138,11 +138,17 @@
         if (stopped || requestController.signal.aborted) return
         if (!response || response.ok !== true) throw new Error('Settings API returned an HTTP error')
 
-        const body = await response.json()
+        const payload = await response.json()
         if (stopped || requestController.signal.aborted) return
-        if (!isSettingsResponse(body)) throw new Error('Settings API returned an invalid response')
+        if (
+          !isSettingsResponse(payload) ||
+          payload.code !== 200 ||
+          !isSettingsResponse(payload.response)
+        ) {
+          throw new Error('Settings API returned an invalid response')
+        }
 
-        applySettings(normalizeSettings(body))
+        applySettings(normalizeSettings(payload.response))
         failureActive = false
       } catch (error) {
         if (stopped || requestController.signal.aborted || (error && error.name === 'AbortError')) return

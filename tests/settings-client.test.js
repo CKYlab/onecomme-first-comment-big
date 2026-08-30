@@ -28,6 +28,10 @@ function responseWith(body, { ok = true } = {}) {
   }
 }
 
+function settingsResponse(settings) {
+  return responseWith({ code: 200, response: settings })
+}
+
 function deferred() {
   let resolve
   let reject
@@ -267,7 +271,7 @@ test('既定値と正規化規則をプラグインcoreへ依存せず公開す�
 })
 
 test('既定応答はCSSとfitを再適用しない', async () => {
-  const harness = makeHarness([responseWith(DEFAULT_SETTINGS)])
+  const harness = makeHarness([settingsResponse(DEFAULT_SETTINGS)])
 
   await harness.client.start()
 
@@ -276,16 +280,16 @@ test('既定応答はCSSとfitを再適用しない', async () => {
 })
 
 test('変更された設定に対応するCSS変数だけを更新し各応答の最後にfitを一度呼ぶ', async () => {
-  const dark = { theme: 'dark', commentFontSize: 32, firstCommentFontSize: 64 }
-  const comment40 = { ...dark, commentFontSize: 40 }
-  const first80 = { ...comment40, firstCommentFontSize: 80 }
-  const allChanged = { theme: 'light', commentFontSize: 44, firstCommentFontSize: 84 }
+  const dark = { theme: 'dark', commentFontSize: 40, firstCommentFontSize: 80 }
+  const comment44 = { ...dark, commentFontSize: 44 }
+  const first84 = { ...comment44, firstCommentFontSize: 84 }
+  const light = { ...first84, theme: 'light' }
   const harness = makeHarness([
-    responseWith(dark),
-    responseWith(comment40),
-    responseWith(first80),
-    responseWith(first80),
-    responseWith(allChanged),
+    settingsResponse(dark),
+    settingsResponse(dark),
+    settingsResponse(comment44),
+    settingsResponse(first84),
+    settingsResponse(light),
   ])
 
   await harness.client.start()
@@ -293,20 +297,22 @@ test('変更された設定に対応するCSS変数だけを更新し各応答�
     ['--panel-background', '#0b0b0b'],
     ['--comment-text-color', '#ffffff'],
     ['--comment-border-color', '#333333'],
+    ['--comment-font-size', '40px'],
+    ['--first-comment-font-size', '80px'],
   ])
   assert.equal(harness.fitCalls(), 1)
-
-  await harness.tick()
-  assert.deepEqual(harness.styleCalls.at(-1), ['--comment-font-size', '40px'])
-  assert.equal(harness.fitCalls(), 2)
-
-  await harness.tick()
-  assert.deepEqual(harness.styleCalls.at(-1), ['--first-comment-font-size', '80px'])
-  assert.equal(harness.fitCalls(), 3)
 
   const callsBeforeSameValue = harness.styleCalls.length
   await harness.tick()
   assert.equal(harness.styleCalls.length, callsBeforeSameValue)
+  assert.equal(harness.fitCalls(), 1)
+
+  await harness.tick()
+  assert.deepEqual(harness.styleCalls.at(-1), ['--comment-font-size', '44px'])
+  assert.equal(harness.fitCalls(), 2)
+
+  await harness.tick()
+  assert.deepEqual(harness.styleCalls.at(-1), ['--first-comment-font-size', '84px'])
   assert.equal(harness.fitCalls(), 3)
 
   const eventOffset = harness.events.length
@@ -315,15 +321,13 @@ test('変更された設定に対応するCSS変数だけを更新し各応答�
     ['set', '--panel-background', '#ffffff'],
     ['set', '--comment-text-color', '#000000'],
     ['set', '--comment-border-color', '#d8d8d8'],
-    ['set', '--comment-font-size', '44px'],
-    ['set', '--first-comment-font-size', '84px'],
     ['fit'],
   ])
   assert.equal(harness.fitCalls(), 4)
 })
 
 test('startは公式endpointへ即時GETし500msタイマーとno-storeとAbort signalを使う', async () => {
-  const harness = makeHarness([responseWith(DEFAULT_SETTINGS)])
+  const harness = makeHarness([settingsResponse(DEFAULT_SETTINGS)])
 
   await harness.client.start()
 
@@ -370,7 +374,7 @@ test('endpointと間隔を注入でき、開始を重ねてもタイマーと即
   assert.equal(harness.intervals[0].milliseconds, 750)
   assert.equal(harness.fetchCalls[0].url, 'http://localhost/custom')
 
-  pending.resolve(responseWith(DEFAULT_SETTINGS))
+  pending.resolve(settingsResponse(DEFAULT_SETTINGS))
   await Promise.all([firstStart, secondStart])
 })
 
@@ -378,14 +382,14 @@ test('GET中のtickをスキップし完了後のtickでは次のGETを開始す
   const pending = deferred()
   const harness = makeHarness([
     () => pending.promise,
-    responseWith(DEFAULT_SETTINGS),
+    settingsResponse(DEFAULT_SETTINGS),
   ])
 
   const starting = harness.client.start()
   await harness.tick()
   assert.equal(harness.fetchCalls.length, 1)
 
-  pending.resolve(responseWith(DEFAULT_SETTINGS))
+  pending.resolve(settingsResponse(DEFAULT_SETTINGS))
   await starting
   await harness.tick()
   assert.equal(harness.fetchCalls.length, 2)
@@ -398,12 +402,16 @@ test('HTTP・fetch・JSON・応答構造の失敗は既定値へ戻りPromiseを
     () => responseWith(new Error('invalid json')),
     () => responseWith(null),
     () => responseWith([]),
+    () => responseWith({ code: 400, response: { message: 'error' } }),
+    () => responseWith({ code: 200 }),
+    () => responseWith({ code: 200, response: null }),
+    () => responseWith({ code: 200, response: [] }),
   ]
 
   for (const makeFailure of failureFactories) {
     const failure = makeFailure()
     const harness = makeHarness([
-      responseWith({ theme: 'dark', commentFontSize: 40, firstCommentFontSize: 80 }),
+      settingsResponse({ theme: 'dark', commentFontSize: 40, firstCommentFontSize: 80 }),
       failure,
     ])
     await assert.doesNotReject(harness.client.start())
@@ -421,10 +429,10 @@ test('HTTP・fetch・JSON・応答構造の失敗は既定値へ戻りPromiseを
   }
 })
 
-test('妥当な応答objectの不正項目だけを既定値へ正規化する', async () => {
+test('妥当なenvelopeのresponse内にある不正項目だけを既定値へ正規化する', async () => {
   const harness = makeHarness([
-    responseWith({ theme: 'dark', commentFontSize: 40, firstCommentFontSize: 80 }),
-    responseWith({ theme: 'dark', commentFontSize: '48', firstCommentFontSize: 96 }),
+    settingsResponse({ theme: 'dark', commentFontSize: 40, firstCommentFontSize: 80 }),
+    settingsResponse({ theme: 'dark', commentFontSize: '48', firstCommentFontSize: 96 }),
   ])
 
   await harness.client.start()
@@ -442,7 +450,7 @@ test('同じ失敗期間は一度だけ警告し正常復帰後の再失敗で�
   const harness = makeHarness([
     new Error('offline 1'),
     new Error('offline 2'),
-    responseWith({ theme: 'dark', commentFontSize: 40, firstCommentFontSize: 80 }),
+    settingsResponse({ theme: 'dark', commentFontSize: 40, firstCommentFontSize: 80 }),
     new Error('offline again'),
   ])
 
@@ -478,7 +486,11 @@ test('stop後に遅延応答が完了してもCSS・fit・警告を発生させ�
   const starting = harness.client.start()
 
   harness.client.stop()
-  pending.resolve(responseWith({ theme: 'dark', commentFontSize: 40, firstCommentFontSize: 80 }))
+  pending.resolve(settingsResponse({
+    theme: 'dark',
+    commentFontSize: 40,
+    firstCommentFontSize: 80,
+  }))
   await assert.doesNotReject(starting)
 
   assert.deepEqual(harness.styleCalls, [])
