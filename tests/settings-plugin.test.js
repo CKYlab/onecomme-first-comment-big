@@ -77,17 +77,24 @@ test('initialDataを永続設定へ使用せずstoreの保存済み設定を維�
 })
 
 test('GETが完全な正規化設定を返し不正なstoreを一度だけ修復する', async () => {
-  const store = makeStore({ theme: 'neon', commentFontSize: 12, unknown: true })
+  const store = makeStore({ ...defaults })
   const plugin = loadPlugin()
   plugin.init({ store })
   const writesAfterInit = store.writes()
+  store.store = { theme: 'neon', commentFontSize: 12, unknown: true }
+  const writesBeforeGet = store.writes()
 
   const result = await plugin.request({ method: 'GET' })
 
   assert.deepEqual(result, { code: 200, response: defaults })
   assert.deepEqual(store.snapshot(), defaults)
-  assert.equal(writesAfterInit, 1)
-  assert.equal(store.writes(), 1)
+  assert.equal(writesAfterInit, 0)
+  assert.equal(writesBeforeGet, 1)
+  assert.equal(store.writes(), 2)
+
+  await plugin.request({ method: 'GET' })
+
+  assert.equal(store.writes(), 2)
 })
 
 test('同一状態の連続GETがstore setterを増やさない', async () => {
