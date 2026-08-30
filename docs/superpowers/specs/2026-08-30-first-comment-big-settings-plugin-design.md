@@ -83,9 +83,11 @@ localStorage共有、設定ファイルの直接読み書き、WebSocketによ�
 | version | 1.0.0 |
 | author | CKY Lab |
 | url | http://localhost:11180/plugins/com.ckylab.first-comment-big-settings/index.html |
-| permissions | 空配列 |
+| permissions | `[]` を第一候補とし、実装時に公式型定義と実機で受理可否を確認する |
 
-コメントや配信イベントを購読しないため権限は要求しない。defaultStateには4章の既定設定を指定する。
+コメントや配信イベントを購読しないため、`permissions: []` を第一候補とする。ただし、空配列が公式に許可されることは現時点では未確認である。実装時に、`@onecomme.com/onesdk` の公式型定義で空配列が受理されることと、わんコメ実機で `permissions: []` のプラグインが正常に読み込まれることを確認する。
+
+空配列が受理されない場合も、便宜的に `comments` やその他の不要な権限を追加しない。その場合は実装を止め、必要な権限仕様を公式ドキュメントまたは開発者チャンネルで再確認する。これは実装着手時の検証ゲートであり、権限の代替値を事前に推測するものではない。defaultStateには4章の既定設定を指定する。
 
 ### 5.3 状態初期化
 
