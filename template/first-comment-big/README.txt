@@ -1,7 +1,7 @@
 わんコメ用「初コメBIG」v1.1
 
 【動作】
-コメント本文だけを白背景・黒文字の縦型パネルへ上から下に表示し、その
+コメント本文だけを縦型パネルへ上から下に表示し、その
 配信で初めてコメントした人の本文だけを大きくします。名前、匿名番号、
 ID、通常ユーザーアイコン、初コメラベルは表示しません。配信者本人だけは
 小さなプロフィール画像を本文の左へ表示します。
@@ -37,8 +37,9 @@ data.hasGift === true のアイテム・ギフトは常に通常サイズです�
 履歴を消費しません。TwitCastingではHTTP/HTTPSのdata.item.imageを小さな
 画像に使い、item.nameを表示します。speechText先頭の重複したitem.nameだけ
 を最大2回除去し、残った任意コメントや🍡表記は解析せず保持します。無料
-giftは白背景・黒文字、有料giftはOneSDKのdata.colorsを行全体へ適用し、
-価格から色を算出しません。色が使えない場合は白背景・黒文字へ戻します。
+giftと有効色がない有料giftはテーマ色へ追従します。有効なOneSDKの
+data.colorsがある有料giftはその色を行全体へ適用し、価格から色を算出
+しません。
 名前がない場合だけspeechText全体を使い、HTML入りcommentは解析・描画
 しません。
 
@@ -55,39 +56,56 @@ data.commentのHTMLとspeechTextは使わず、origin.messageを1回だけ文字
 デコードして安全な文字列として描画します。
 
 【重要な制約】
-配信途中で初めて起動した場合、起動前のTwitCasting匿名履歴は復元できず、
-起動後の初観測コメントをBIG扱いする可能性があります。一度観測して保存
-できた匿名履歴は、同じliveIdの再読み込み後に復元します。
+配信途中で初めて起動した場合、起動前のTwitCasting匿名履歴は復元できません。
+匿名BIGがONなら、起動後の初観測コメントをBIG扱いする可能性があります。
+一度観測して保存できた匿名履歴は、同じliveIdの再読み込み後に復元します。
 
 【設定プラグイン（任意）】
 設定プラグイン com.ckylab.first-comment-big-settings は任意です。未導入でも、
-コメント表示は従来どおり light / 32px / 64px の既定値で続きます。導入と
+コメント表示は light / 標準フォント / 32px / 64px / 匿名BIG OFFの既定値で
+続きます。導入と
 有効化は公式プラグイン画面で行い、設定画面も同じ公式プラグイン画面から
 開きます。
 
-設定項目は次の3つだけです。
+設定項目は次の5つです。
 - テーマ: light または dark（既定値: light）
+- フォント: 標準（游ゴシック）／メイリオ／太ゴシック（BIZ UDPゴシック）／
+  丸ゴシック（M PLUS Rounded 1c）
 - 通常コメント文字サイズ: 16〜64px の整数（既定値: 32px）
 - 初コメBIG文字サイズ: 24〜128px の整数（既定値: 64px）
+- ツイキャス匿名コメントも初コメBIG: ON / OFF（既定値: OFF）
 
 保存後の設定は通常最大約0.5秒（500ms）でOBSへ反映され、OBSの再読み込みは
 不要です。プラグインが未導入・無効・起動前の場合、および通信・JSON・値の
-異常時は、テーマ light、通常32px、初コメBIG64pxへ戻ります。この設定に
+異常時は既定値へ戻ります。この設定に
 関わる障害が起きてもOneSDKのコメント購読は停止しません。テーマを変更しても、
-TwitCastingとKickのgiftは各イベント固有の背景色・文字色を維持します。
+有効な配信固有色を持つTwitCastingとKickのgiftはその色を維持します。
 
-permissions: [] が実機で正式対応済みかどうかの確認はTask 10で行う予定です。
-Task 10の実機確認前に、正式対応済みとは断言しません。
+丸ゴシックは選択した時だけGoogle Fontsから太さ700を読み込むため、PCへの
+インストールは不要です。取得失敗時はローカルフォントへ戻ります。他の3種
+ではGoogle Fontsを読み込みません。
+
+匿名BIGがOFFでも履歴は記録します。後からONにしても既観測匿名は通常表示で、
+ON中に初めて観測した匿名だけがBIGになります。permissions: [] の読込、
+有効化、設定GET/PUTは実機確認済みです。
+
+設定プラグインを差し替え・更新した場合は、わんコメを再起動してください。
+既存OBSソースを流用する場合は、以前のカスタムCSSが表示サイズやowner表示へ
+影響していないか確認してください。OBS側でソースを縮小すると、設定したpx値
+より見た目が小さくなります。既定値は通常32px、初コメBIG64pxです。
 
 【文字サイズ】
 style.cssまたはOBSのカスタムCSSで次を変更します。
 
 :root {
+  --comment-font-family: "Yu Gothic UI", "Yu Gothic", Meiryo, sans-serif;
   --comment-font-size: 32px;
   --first-comment-font-size: 64px;
   --panel-background: #ffffff;
   --comment-text-color: #000000;
   --comment-border-color: #d8d8d8;
+  --gift-neutral-background: #ffffff;
+  --gift-neutral-text-color: #000000;
   --comment-padding-x: 16px;
   --comment-padding-y: 10px;
   --gift-image-size: 1.65em;
@@ -98,18 +116,17 @@ style.cssまたはOBSのカスタムCSSで次を変更します。
 }
 
 長文は最大幅で折り返します。コメント間は薄い横線で区切り、新着を上へ
-追加します。表示領域を超えた古い下側のコメントから削除します。1件だけ
-の巨大コメントは削除せず、DOM異常増加対策として最大100件に制限します。
+追加します。DOMは最大100件で、超過時だけ最古コメントを削除します。高さを
+超えた部分はoverflow-y:hiddenで表示範囲外へクリップし、高さを理由にDOMから
+削除しないため、BIG通過後も表示下部へ大きな空白を残しません。
 
 【追加方法】
-v1.1の配布ZIPはまだ生成していません。確認後、このREADME.txtが入った
+正式配布時は、このREADME.txtが入った
 first-comment-bigフォルダを包むZIPを作り、わんコメのテンプレート一覧へ
 ドラッグ＆ドロップします。基準サイズは幅1920・高さ1080です。
 
-【未確認】
-本番テンプレートのわんコメへの追加、OBS表示、実配信のTwitCasting通常・
-匿名・giftとdata.item.image、TwitCasting／Kick配信者本人コメントと画像、
-YouTube / Twitch、KickエモートのOBS実表示、長時間・複数同時配信は未確認
-です。Kick BASIC 100 Full SendとLEVEL_UPのRAW構造、およびBASIC 100の
-わんコメ標準表示は確認済みですが、この初コメBIGテンプレート／OBSでの
-BASIC 100表示はまだ未確認です。
+【実機確認】
+わんコメ／OBSで、初コメBIG後の表示、最大100件、4種類のフォント、Google
+Fonts版丸ゴシック、匿名BIG ON/OFF、gift色、owner表示、設定のリアルタイム
+反映を確認済みです。YouTube / Twitch実データ、長時間・複数同時配信、将来の
+わんコメ更新後の挙動は継続確認対象です。

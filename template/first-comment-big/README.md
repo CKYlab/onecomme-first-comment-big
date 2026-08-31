@@ -1,6 +1,6 @@
 # 初コメBIG v1.1
 
-わんコメのコメント本文だけを白背景の縦型パネルへ表示し、その配信で初めてコメントした人の本文だけを大きくするOBS向けカスタムテンプレートです。ユーザー名、匿名番号、screenName、ユーザーID、初コメラベルは画面へ表示しません。配信者本人のコメントだけは、小さなプロフィール画像を本文の左へ表示します。
+わんコメのコメント本文だけを縦型パネルへ表示し、その配信で初めてコメントした人の本文だけを大きくするOBS向けカスタムテンプレートです。ユーザー名、匿名番号、screenName、ユーザーID、初コメラベルは画面へ表示しません。配信者本人のコメントだけは、小さなプロフィール画像を本文の左へ表示します。
 
 ## 判定方法
 
@@ -12,9 +12,9 @@ TwitCastingでは `data.isOwner === true`、Kickでは `data.origin.sender.ident
 
 Kickでは `data.origin.content` の `[emote:数字ID:エモート名]` を安全なトークンとして解析し、通常エモートと配信者オリジナルエモートを共通処理でインライン画像表示します。複数エモートにも対応し、`data.comment` のHTMLは使用しません。画像を読み込めない場合はエモート名へ戻します。エモートを含む行も `isFirstTime === true` なら本文と画像が初コメBIGのサイズに追従します。
 
-TwitCasting匿名コメントは `service === 'twicas'` かつ `data.isAnonymous === true` の場合だけ独自判定します。匿名番号付きの `data.name` を数字へ分解せず、`service + liveId + data.name` の組み合わせを配信単位の識別情報として使います。`userId` や `screenName` の `tw1` / `tw2` / `tw3` は匿名識別に使いません。
+TwitCasting匿名コメントは `service === 'twicas'` かつ `data.isAnonymous === true` の場合だけ独自履歴へ記録します。匿名番号付きの `data.name` を数字へ分解せず、`service + liveId + data.name` の組み合わせを配信単位の識別情報として使います。`userId` や `screenName` の `tw1` / `tw2` / `tw3` は匿名識別に使いません。匿名コメントをBIGにする設定は既定でOFFです。
 
-`data.hasGift === true` のアイテム・ギフトは、`isFirstTime` の値に関係なく常に通常サイズです。giftイベントは匿名履歴を消費しません。TwitCasting giftでは、構造化された `data.item.image` がHTTP/HTTPS URLの場合だけ小さな画像として表示し、`data.item.name` を表示します。`speechText` 先頭の重複したアイテム名だけを最大2回除去し、残った任意コメントや🍡表記を解析せずそのまま保持します。無料giftは白背景・黒文字、有料giftはOneSDKの `data.colors.bodyBackgroundColor` と `bodyTextColor` を行全体へ適用し、価格から色を算出しません。色が使えない場合は白背景・黒文字へ戻します。`item.name` がない場合だけ `speechText` 全体を使います。HTMLを含み得る `data.comment` は解析・描画しません。
+`data.hasGift === true` のアイテム・ギフトは、`isFirstTime` の値に関係なく常に通常サイズです。giftイベントは匿名履歴を消費しません。TwitCasting giftでは、構造化された `data.item.image` がHTTP/HTTPS URLの場合だけ小さな画像として表示し、`data.item.name` を表示します。`speechText` 先頭の重複したアイテム名だけを最大2回除去し、残った任意コメントや🍡表記を解析せずそのまま保持します。無料giftと、有料giftで有効なOneSDK色がない場合はneutral giftとしてテーマ色へ追従します。有効な `data.colors.bodyBackgroundColor` と `bodyTextColor` がある有料giftは、その色を行全体へ適用し、価格から色を算出しません。`item.name` がない場合だけ `speechText` 全体を使います。HTMLを含み得る `data.comment` は解析・描画しません。
 
 Kickギフトは `service === 'kick'` かつ `data.hasGift === true` で判定し、実配信RAWで確認したBASICとLEVEL_UPを同じ表示処理で扱います。`data.gift`、`data.origin.gift.amount`、`data.colors`、`data.origin.message` の構造化フィールドだけを使い、1段目にHTTP/HTTPSの画像と括弧付き金額、添付コメントがある場合だけ2段目にコメントを表示します。`static_url` を優先し、読込失敗時は別URLの `animated_url` へ一度だけ切り替えます。BASIC 100 Full Sendのように `animated_url` がなくても `static_url` だけで表示でき、画像を読み込めない場合も画像だけを削除して金額とコメントを残します。Kick指定の背景色・文字色が使えない場合は白背景・黒文字へ戻ります。Kickギフトは常に通常サイズで、ユーザー名やプロフィール画像を表示せず、`data.comment` のHTMLや `speechText` は使用しません。添付コメントは `origin.message` を1回だけHTML文字参照デコードした後も安全な文字列として描画します。
 
@@ -47,29 +47,42 @@ Kickギフトは `service === 'kick'` かつ `data.hasGift === true` で判定�
 
 ## 設定プラグイン（任意）
 
-設定プラグイン `com.ckylab.first-comment-big-settings` は任意です。未導入でも、コメント表示は従来どおり `light` / 32px / 64px の既定値で続きます。導入と有効化は公式プラグイン画面で行い、設定画面も同じ公式プラグイン画面から開きます。
+設定プラグイン `com.ckylab.first-comment-big-settings` は任意です。未導入でも、コメント表示は `light` / 標準フォント / 32px / 64px / 匿名BIG OFFの既定値で続きます。導入と有効化は公式プラグイン画面で行い、設定画面も同じ公式プラグイン画面から開きます。
 
-設定項目は次の3つだけです。
+設定項目は次の5つです。
 
 - テーマ: `light` または `dark`（既定値: `light`）
+- フォント（既定値: 標準）
+  - 標準（游ゴシック）
+  - メイリオ
+  - 太ゴシック（BIZ UDPゴシック）
+  - 丸ゴシック（M PLUS Rounded 1c）
 - 通常コメント文字サイズ: 16〜64px の整数（既定値: 32px）
 - 初コメBIG文字サイズ: 24〜128px の整数（既定値: 64px）
+- ツイキャス匿名コメントも初コメBIG: ON / OFF（既定値: OFF）
 
-保存後の設定は通常最大約0.5秒（500ms）でOBSへ反映され、OBSの再読み込みは不要です。プラグインが未導入・無効・起動前の場合、および通信・JSON・値の異常時は、テーマ `light`、通常32px、初コメBIG64pxへ戻ります。この設定に関わる障害が起きてもOneSDKのコメント購読は停止しません。テーマを変更しても、TwitCastingとKickのgiftは各イベント固有の背景色・文字色を維持します。
+保存後の設定は通常最大約0.5秒（500ms）でOBSへ反映され、OBSの再読み込みは不要です。プラグインが未導入・無効・起動前の場合、および通信・JSON・値の異常時は既定値へ戻ります。この設定に関わる障害が起きてもOneSDKのコメント購読は停止しません。テーマを変更しても、有効な配信固有色を持つTwitCasting/Kick giftはその背景色・文字色を維持します。
 
-`permissions: []` が実機で正式対応済みかどうかの確認はTask 10で行う予定です。Task 10の実機確認前に、正式対応済みとは断言しません。
+丸ゴシックは選択したときだけGoogle Fontsから `M PLUS Rounded 1c` の太さ700を読み込むため、PCへのフォントインストールは不要です。ネットワーク取得に失敗した場合はBIZ UDPゴシックや游ゴシックなどのローカルフォントへ戻ります。標準、メイリオ、太ゴシックではGoogle Fontsを読み込みません。
+
+匿名BIGがOFFでも匿名履歴は記録します。その後ONへ切り替えても既に観測した匿名ユーザーはBIGにならず、ON中に初めて観測した匿名ユーザーだけがBIGになります。`permissions: []` のプラグイン読込・有効化・設定GET/PUTは実機で確認済みです。
+
+設定プラグインを差し替え・更新した場合は、わんコメを再起動してください。既存のOBSブラウザソースを流用する場合、以前のテンプレート用カスタムCSSが表示サイズやownerコメントへ影響することがあるため、カスタムCSSを確認してください。OBS側でソースを縮小している場合、設定したpx値より実際の見た目は小さくなります。既定値は通常32px、初コメBIG64pxです。
 
 ## 表示とCSS変数
 
-デフォルトは白背景・黒文字で、新着を最上部へ追加し、既存コメントを下へ押し下げます。表示領域の高さを超えた古いコメントは最下部から削除します。1件だけの大きなコメントは削除せず、DOM異常増加対策として最大100件の安全上限を設けています。通常サイズとBIGサイズを含む主な表示値は `style.css` 冒頭のCSS変数で変更できます。
+デフォルトは白背景・黒文字で、新着を最上部へ追加し、既存コメントを下へ押し下げます。DOMは最大100件とし、100件を超えた場合だけ最下部の最古コメントを削除します。表示領域の高さを超える部分は `overflow-y: hidden` でクリップし、高さを理由にDOMから削除しないため、BIGが下端を通過した後も表示下部へ大きな空白を残しません。通常サイズとBIGサイズを含む主な表示値は `style.css` 冒頭のCSS変数で変更できます。
 
 ```css
 :root {
+  --comment-font-family: "Yu Gothic UI", "Yu Gothic", Meiryo, sans-serif;
   --comment-font-size: 32px;
   --first-comment-font-size: 64px;
   --panel-background: #ffffff;
   --comment-text-color: #000000;
   --comment-border-color: #d8d8d8;
+  --gift-neutral-background: #ffffff;
+  --gift-neutral-text-color: #000000;
   --comment-padding-x: 16px;
   --comment-padding-y: 10px;
   --gift-image-size: 1.65em;
@@ -92,18 +105,10 @@ OBSブラウザソースの「カスタムCSS」末尾へ同じ変数を追加�
 
 ## わんコメへの追加
 
-v1.1の配布ZIPはまだ生成しません。確認後に配布する際は、このREADMEがある `first-comment-big` フォルダを包んだZIPを作り、わんコメのテンプレート一覧へドラッグ＆ドロップします。その後、青い「ここをドラッグしてOBSに入れる」をOBSへ移します。テンプレートの基準サイズは幅1920・高さ1080です。
+正式配布用ZIPを作成する際は、このREADMEがある `first-comment-big` フォルダを包んだZIPを作り、わんコメのテンプレート一覧へドラッグ＆ドロップします。その後、青い「ここをドラッグしてOBSに入れる」をOBSへ移します。テンプレートの基準サイズは幅1920・高さ1080です。
 
-## 今回の変更後ビルドでは未確認
+## 実機確認
 
-- わんコメへの本番テンプレート追加と認識
-- OBSブラウザソースでの実表示
-- 実配信のTwitCasting通常・匿名・giftコメント
-- 実配信のTwitCasting／Kick配信者本人コメントとプロフィール画像
-- 実配信での `data.item.image` の読込と表示
-- YouTube / Twitchの実データと `isFirstTime`
-- KickエモートのOBSブラウザソースでの実表示と画像読込
-- 初コメBIGテンプレート／OBSでのKick BASIC 100 Full Send表示（BASIC 100とLEVEL_UPのRAW構造、およびBASIC 100のわんコメ標準表示は実配信・実画面で確認済み）
-- 長時間配信、複数同時配信、わんコメ更新後の挙動
+わんコメ／OBS実機で、初コメBIG後の表示、最大100件、4種類のフォント、Google Fonts版丸ゴシック、匿名BIG ON/OFF、gift色、owner表示、設定のリアルタイム反映を確認済みです。YouTube / Twitchの実データ、長時間配信、複数同時配信、将来のわんコメ更新後の挙動は継続確認対象です。
 
 Nodeテストや偽OneSDK fixtureの成功を、これらの実機確認済みという意味では扱いません。

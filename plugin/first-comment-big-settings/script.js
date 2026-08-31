@@ -24,8 +24,10 @@
   const ELEMENT_IDS = [
     'settings-form',
     'theme',
+    'font-preset',
     'comment-font-size',
     'first-comment-font-size',
+    'anonymous-first-comment-big',
     'save',
     'status',
   ]
@@ -53,8 +55,10 @@
     }
 
     const theme = elements.theme
+    const fontPreset = elements['font-preset']
     const commentFontSize = elements['comment-font-size']
     const firstCommentFontSize = elements['first-comment-font-size']
+    const anonymousFirstCommentBig = elements['anonymous-first-comment-big']
     const saveButton = elements.save
     const status = elements.status
     let pendingRequestCount = 0
@@ -73,8 +77,10 @@
     function applySettings(value) {
       const normalized = settingsCore.normalizeSettings(value)
       theme.value = normalized.theme
+      fontPreset.value = normalized.fontPreset
       commentFontSize.value = String(normalized.commentFontSize)
       firstCommentFontSize.value = String(normalized.firstCommentFontSize)
+      anonymousFirstCommentBig.checked = normalized.anonymousFirstCommentBig
     }
 
     async function readResponseSettings(response) {
@@ -120,8 +126,10 @@
       try {
         const settings = settingsCore.normalizeSettings({
           theme: theme.value,
+          fontPreset: fontPreset.value,
           commentFontSize: commentFontSize.valueAsNumber,
           firstCommentFontSize: firstCommentFontSize.valueAsNumber,
+          anonymousFirstCommentBig: anonymousFirstCommentBig.checked,
         })
         const response = await fetchImpl(endpoint, {
           method: 'PUT',

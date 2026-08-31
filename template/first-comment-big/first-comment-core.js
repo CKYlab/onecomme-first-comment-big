@@ -224,7 +224,7 @@
     return isNonBlankString(data.comment) ? data.comment : null
   }
 
-  function createDisplayModel(comment, history) {
+  function createDisplayModel(comment, history, options = {}) {
     if (
       !comment ||
       typeof comment !== 'object' ||
@@ -257,10 +257,12 @@
         data.liveId,
         data.name,
       )
-      const isFirstComment =
+      const firstObserved =
         identity && history && typeof history.remember === 'function'
           ? history.remember(identity)
           : false
+      const isFirstComment =
+        options.anonymousFirstCommentBig === true && firstObserved === true
       return { text, isFirstComment }
     }
 

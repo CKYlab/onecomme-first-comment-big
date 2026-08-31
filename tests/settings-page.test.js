@@ -15,6 +15,7 @@ function createElement(initial = {}) {
   return {
     value: '',
     valueAsNumber: NaN,
+    checked: false,
     disabled: false,
     textContent: '',
     listeners: new Map(),
@@ -29,8 +30,10 @@ function createFakeDocument() {
   const elements = new Map([
     ['settings-form', createElement()],
     ['theme', createElement({ value: 'light' })],
+    ['font-preset', createElement({ value: 'standard' })],
     ['comment-font-size', createElement({ value: '32', valueAsNumber: 32 })],
     ['first-comment-font-size', createElement({ value: '64', valueAsNumber: 64 })],
+    ['anonymous-first-comment-big', createElement({ checked: false })],
     ['save', createElement()],
     ['status', createElement()],
   ])
@@ -60,7 +63,7 @@ function deferred() {
   return { promise, resolve }
 }
 
-test('loadはGET応答を正規化して3入力へ反映する', async () => {
+test('loadはGET応答を正規化して5入力へ反映する', async () => {
   const document = createFakeDocument()
   const calls = []
   const controller = createSettingsPageController({
@@ -73,8 +76,10 @@ test('loadはGET応答を正規化して3入力へ反映する', async () => {
         code: 200,
         response: {
           theme: 'dark',
+          fontPreset: 'rounded',
           commentFontSize: 40,
           firstCommentFontSize: 80,
+          anonymousFirstCommentBig: true,
           ignored: true,
         },
       })
@@ -88,14 +93,18 @@ test('loadはGET応答を正規化して3入力へ反映する', async () => {
     options: { method: 'GET' },
   }])
   assert.equal(document.elements.get('theme').value, 'dark')
+  assert.equal(document.elements.get('font-preset').value, 'rounded')
   assert.equal(document.elements.get('comment-font-size').value, '40')
   assert.equal(document.elements.get('first-comment-font-size').value, '80')
+  assert.equal(document.elements.get('anonymous-first-comment-big').checked, true)
   assert.equal(document.elements.get('status').textContent, '')
 })
 
 test('loadはHTTP成功でもplugin codeが200以外なら取得失敗として扱う', async () => {
   const document = createFakeDocument()
   document.elements.get('theme').value = 'dark'
+  document.elements.get('font-preset').value = 'rounded'
+  document.elements.get('anonymous-first-comment-big').checked = true
   document.elements.get('comment-font-size').value = '40'
   document.elements.get('first-comment-font-size').value = '80'
   const controller = createSettingsPageController({
@@ -109,8 +118,10 @@ test('loadはHTTP成功でもplugin codeが200以外なら取得失敗として�
   await controller.load()
 
   assert.equal(document.elements.get('theme').value, 'light')
+  assert.equal(document.elements.get('font-preset').value, 'standard')
   assert.equal(document.elements.get('comment-font-size').value, '32')
   assert.equal(document.elements.get('first-comment-font-size').value, '64')
+  assert.equal(document.elements.get('anonymous-first-comment-big').checked, false)
   assert.equal(
     document.elements.get('status').textContent,
     '設定を取得できませんでした。',
@@ -130,8 +141,10 @@ test('load失敗時は既定値と固定の取得失敗文を表示する', asyn
   await controller.load()
 
   assert.equal(document.elements.get('theme').value, 'light')
+  assert.equal(document.elements.get('font-preset').value, 'standard')
   assert.equal(document.elements.get('comment-font-size').value, '32')
   assert.equal(document.elements.get('first-comment-font-size').value, '64')
+  assert.equal(document.elements.get('anonymous-first-comment-big').checked, false)
   assert.equal(
     document.elements.get('status').textContent,
     '設定を取得できませんでした。',
@@ -158,8 +171,10 @@ test('loadはGETの非ok応答を失敗として既定値へ戻す', async () =>
   await controller.load()
 
   assert.equal(document.elements.get('theme').value, 'light')
+  assert.equal(document.elements.get('font-preset').value, 'standard')
   assert.equal(document.elements.get('comment-font-size').value, '32')
   assert.equal(document.elements.get('first-comment-font-size').value, '64')
+  assert.equal(document.elements.get('anonymous-first-comment-big').checked, false)
   assert.equal(
     document.elements.get('status').textContent,
     '設定を取得できませんでした。',
@@ -204,16 +219,20 @@ test('新しいsave完了後に初期GET成功が遅れても保存結果を上�
 
   const loading = controller.load()
   document.elements.get('theme').value = 'dark'
+  document.elements.get('font-preset').value = 'rounded'
   document.elements.get('comment-font-size').valueAsNumber = 40
   document.elements.get('first-comment-font-size').valueAsNumber = 80
+  document.elements.get('anonymous-first-comment-big').checked = true
   const saving = controller.save()
 
   putResponse.resolve(jsonResponse({
     code: 200,
     response: {
       theme: 'dark',
+      fontPreset: 'rounded',
       commentFontSize: 41,
       firstCommentFontSize: 81,
+      anonymousFirstCommentBig: true,
     },
   }))
   await saving
@@ -221,15 +240,19 @@ test('新しいsave完了後に初期GET成功が遅れても保存結果を上�
     code: 200,
     response: {
       theme: 'light',
+      fontPreset: 'meiryo',
       commentFontSize: 20,
       firstCommentFontSize: 30,
+      anonymousFirstCommentBig: false,
     },
   }))
   await loading
 
   assert.equal(document.elements.get('theme').value, 'dark')
+  assert.equal(document.elements.get('font-preset').value, 'rounded')
   assert.equal(document.elements.get('comment-font-size').value, '41')
   assert.equal(document.elements.get('first-comment-font-size').value, '81')
+  assert.equal(document.elements.get('anonymous-first-comment-big').checked, true)
   assert.equal(document.elements.get('status').textContent, '保存しました。')
   assert.equal(document.elements.get('save').disabled, false)
 })
@@ -248,18 +271,22 @@ test('新しいsave中に初期GET失敗が先に完了しても入力と状態�
 
   const loading = controller.load()
   document.elements.get('theme').value = 'dark'
+  document.elements.get('font-preset').value = 'rounded'
   document.elements.get('comment-font-size').value = '40'
   document.elements.get('comment-font-size').valueAsNumber = 40
   document.elements.get('first-comment-font-size').value = '80'
   document.elements.get('first-comment-font-size').valueAsNumber = 80
+  document.elements.get('anonymous-first-comment-big').checked = true
   const saving = controller.save()
 
   getResponse.resolve(jsonResponse({}, false))
   await loading
   const stateWhileSavePending = {
     theme: document.elements.get('theme').value,
+    fontPreset: document.elements.get('font-preset').value,
     commentFontSize: document.elements.get('comment-font-size').value,
     firstCommentFontSize: document.elements.get('first-comment-font-size').value,
+    anonymousFirstCommentBig: document.elements.get('anonymous-first-comment-big').checked,
     status: document.elements.get('status').textContent,
     saveDisabled: document.elements.get('save').disabled,
   }
@@ -267,16 +294,20 @@ test('新しいsave中に初期GET失敗が先に完了しても入力と状態�
     code: 200,
     response: {
       theme: 'dark',
+      fontPreset: 'rounded',
       commentFontSize: 40,
       firstCommentFontSize: 80,
+      anonymousFirstCommentBig: true,
     },
   }))
   await saving
 
   assert.deepEqual(stateWhileSavePending, {
     theme: 'dark',
+    fontPreset: 'rounded',
     commentFontSize: '40',
     firstCommentFontSize: '80',
+    anonymousFirstCommentBig: true,
     status: '',
     saveDisabled: true,
   })
@@ -287,10 +318,12 @@ test('新しいsave中に初期GET失敗が先に完了しても入力と状態�
 test('saveはvalueAsNumberから完全設定をPUTして応答を再反映する', async () => {
   const document = createFakeDocument()
   document.elements.get('theme').value = 'dark'
+  document.elements.get('font-preset').value = 'rounded'
   document.elements.get('comment-font-size').value = 'string-must-not-be-used'
   document.elements.get('comment-font-size').valueAsNumber = 40
   document.elements.get('first-comment-font-size').value = 'string-must-not-be-used'
   document.elements.get('first-comment-font-size').valueAsNumber = 80
+  document.elements.get('anonymous-first-comment-big').checked = true
   const calls = []
   const controller = createSettingsPageController({
     document,
@@ -302,8 +335,10 @@ test('saveはvalueAsNumberから完全設定をPUTして応答を再反映する
         code: 200,
         response: {
           theme: 'dark',
+          fontPreset: 'rounded',
           commentFontSize: 40,
           firstCommentFontSize: 80,
+          anonymousFirstCommentBig: true,
         },
       })
     },
@@ -319,12 +354,16 @@ test('saveはvalueAsNumberから完全設定をPUTして応答を再反映する
   assert.deepEqual(calls[0].options.headers, { 'Content-Type': 'application/json' })
   assert.deepEqual(JSON.parse(calls[0].options.body), {
     theme: 'dark',
+    fontPreset: 'rounded',
     commentFontSize: 40,
     firstCommentFontSize: 80,
+    anonymousFirstCommentBig: true,
   })
   assert.equal(document.elements.get('theme').value, 'dark')
+  assert.equal(document.elements.get('font-preset').value, 'rounded')
   assert.equal(document.elements.get('comment-font-size').value, '40')
   assert.equal(document.elements.get('first-comment-font-size').value, '80')
+  assert.equal(document.elements.get('anonymous-first-comment-big').checked, true)
   assert.equal(document.elements.get('status').textContent, '保存しました。')
 })
 
@@ -426,8 +465,10 @@ test('ブラウザ起動時に必須DOMを確認してsubmit登録と初期GET�
         code: 200,
         response: {
           theme: 'dark',
+          fontPreset: 'meiryo',
           commentFontSize: 40,
           firstCommentFontSize: 80,
+          anonymousFirstCommentBig: true,
         },
       })
     },
@@ -439,8 +480,10 @@ test('ブラウザ起動時に必須DOMを確認してsubmit登録と初期GET�
   for (const id of [
     'settings-form',
     'theme',
+    'font-preset',
     'comment-font-size',
     'first-comment-font-size',
+    'anonymous-first-comment-big',
     'save',
     'status',
   ]) {
@@ -457,8 +500,10 @@ test('ブラウザ起動時に必須DOMを確認してsubmit登録と初期GET�
   )
   assert.equal(calls[0].options.method, 'GET')
   assert.equal(document.elements.get('theme').value, 'dark')
+  assert.equal(document.elements.get('font-preset').value, 'meiryo')
   assert.equal(document.elements.get('comment-font-size').value, '40')
   assert.equal(document.elements.get('first-comment-font-size').value, '80')
+  assert.equal(document.elements.get('anonymous-first-comment-big').checked, true)
 })
 
 test('設定画面はinnerHTMLを使用しない', () => {

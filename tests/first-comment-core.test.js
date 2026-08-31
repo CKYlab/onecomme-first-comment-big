@@ -35,6 +35,8 @@ function makeAnonymous(overrides = {}) {
   }
 }
 
+const ANONYMOUS_BIG_ON = Object.freeze({ anonymousFirstCommentBig: true })
+
 test('通常ユーザーは isFirstTime が true の場合だけBIGになる', () => {
   const history = core.createAnonymousHistory()
 
@@ -147,7 +149,25 @@ test('匿名giftは匿名ユーザーの初回を消費しない', () => {
     ),
     { text: '匿名gift', isFirstComment: false },
   )
-  assert.equal(core.createDisplayModel(makeAnonymous(), history).isFirstComment, true)
+  assert.equal(
+    core.createDisplayModel(makeAnonymous(), history, ANONYMOUS_BIG_ON).isFirstComment,
+    true,
+  )
+})
+
+test('匿名BIGがOFFでも履歴へ記録し後からONにしても既観測匿名をBIGへ戻さない', () => {
+  const history = core.createAnonymousHistory()
+
+  assert.equal(core.createDisplayModel(makeAnonymous(), history).isFirstComment, false)
+  assert.deepEqual(history.toJSON(), {
+    version: 1,
+    lives: [{ service: 'twicas', liveId: 'live-a', names: ['匿名コメント#1000'] }],
+  })
+  assert.equal(
+    core.createDisplayModel(makeAnonymous({ comment: 'ON後' }), history, ANONYMOUS_BIG_ON)
+      .isFirstComment,
+    false,
+  )
 })
 
 test('本人情報があるgiftも既存gift分岐を優先して本人表示にしない', () => {
@@ -172,19 +192,34 @@ test('本人情報があるgiftも既存gift分岐を優先して本人表示に
 test('TwitCasting匿名は同じ service・liveId・name の初回だけBIGになる', () => {
   const history = core.createAnonymousHistory()
 
-  assert.equal(core.createDisplayModel(makeAnonymous(), history).isFirstComment, true)
-  assert.equal(core.createDisplayModel(makeAnonymous({ comment: '2回目' }), history).isFirstComment, false)
+  assert.equal(
+    core.createDisplayModel(makeAnonymous(), history, ANONYMOUS_BIG_ON).isFirstComment,
+    true,
+  )
+  assert.equal(
+    core.createDisplayModel(makeAnonymous({ comment: '2回目' }), history, ANONYMOUS_BIG_ON)
+      .isFirstComment,
+    false,
+  )
 })
 
 test('同じ c:tw1 でも name が違えばそれぞれ初回BIGになる', () => {
   const history = core.createAnonymousHistory()
 
   assert.equal(
-    core.createDisplayModel(makeAnonymous({ name: '匿名コメント#1000' }), history).isFirstComment,
+    core.createDisplayModel(
+      makeAnonymous({ name: '匿名コメント#1000' }),
+      history,
+      ANONYMOUS_BIG_ON,
+    ).isFirstComment,
     true,
   )
   assert.equal(
-    core.createDisplayModel(makeAnonymous({ name: '匿名コメント#2000' }), history).isFirstComment,
+    core.createDisplayModel(
+      makeAnonymous({ name: '匿名コメント#2000' }),
+      history,
+      ANONYMOUS_BIG_ON,
+    ).isFirstComment,
     true,
   )
 })
@@ -192,8 +227,8 @@ test('同じ c:tw1 でも name が違えばそれぞれ初回BIGになる', () =
 test('同じ匿名名でも liveId が違えばそれぞれ初回BIGになる', () => {
   const history = core.createAnonymousHistory()
 
-  assert.equal(core.createDisplayModel(makeAnonymous({ liveId: 'live-a' }), history).isFirstComment, true)
-  assert.equal(core.createDisplayModel(makeAnonymous({ liveId: 'live-b' }), history).isFirstComment, true)
+  assert.equal(core.createDisplayModel(makeAnonymous({ liveId: 'live-a' }), history, ANONYMOUS_BIG_ON).isFirstComment, true)
+  assert.equal(core.createDisplayModel(makeAnonymous({ liveId: 'live-b' }), history, ANONYMOUS_BIG_ON).isFirstComment, true)
 })
 
 test('TwitCasting匿名で liveId または name が欠落した場合は通常サイズになる', () => {
@@ -217,10 +252,10 @@ test('他サービスの isAnonymous は匿名独自履歴を使わない', () =
 test('localStorageから復元した匿名ユーザーは通常サイズになる', () => {
   const storage = makeStorage()
   const firstHistory = core.createAnonymousHistory({ storage })
-  assert.equal(core.createDisplayModel(makeAnonymous(), firstHistory).isFirstComment, true)
+  assert.equal(core.createDisplayModel(makeAnonymous(), firstHistory, ANONYMOUS_BIG_ON).isFirstComment, true)
 
   const restoredHistory = core.createAnonymousHistory({ storage })
-  assert.equal(core.createDisplayModel(makeAnonymous(), restoredHistory).isFirstComment, false)
+  assert.equal(core.createDisplayModel(makeAnonymous(), restoredHistory, ANONYMOUS_BIG_ON).isFirstComment, false)
 })
 
 test('localStorage読み込み不能でもメモリ上で2回目を通常サイズにして警告は1回だけ出す', () => {
@@ -235,8 +270,8 @@ test('localStorage読み込み不能でもメモリ上で2回目を通常サイ�
   }
   const history = core.createAnonymousHistory({ storage, warn: (message) => warnings.push(message) })
 
-  assert.equal(core.createDisplayModel(makeAnonymous(), history).isFirstComment, true)
-  assert.equal(core.createDisplayModel(makeAnonymous(), history).isFirstComment, false)
+  assert.equal(core.createDisplayModel(makeAnonymous(), history, ANONYMOUS_BIG_ON).isFirstComment, true)
+  assert.equal(core.createDisplayModel(makeAnonymous(), history, ANONYMOUS_BIG_ON).isFirstComment, false)
   assert.equal(warnings.length, 1)
 })
 
@@ -254,8 +289,8 @@ test('localStorage保存不能でもメモリを先に更新して警告は1回�
   }
   const history = core.createAnonymousHistory({ storage, warn: (message) => warnings.push(message) })
 
-  assert.equal(core.createDisplayModel(makeAnonymous(), history).isFirstComment, true)
-  assert.equal(core.createDisplayModel(makeAnonymous(), history).isFirstComment, false)
+  assert.equal(core.createDisplayModel(makeAnonymous(), history, ANONYMOUS_BIG_ON).isFirstComment, true)
+  assert.equal(core.createDisplayModel(makeAnonymous(), history, ANONYMOUS_BIG_ON).isFirstComment, false)
   assert.equal(writes, 1)
   assert.equal(warnings.length, 1)
 })
@@ -399,7 +434,7 @@ test('TwitCasting匿名本人コメントは匿名履歴を消費しない', () 
   const owner = makeAnonymous({ isOwner: true, isFirstTime: true })
 
   assert.equal(core.createDisplayModel(owner, history).isOwner, true)
-  assert.equal(core.createDisplayModel(makeAnonymous(), history).isFirstComment, true)
+  assert.equal(core.createDisplayModel(makeAnonymous(), history, ANONYMOUS_BIG_ON).isFirstComment, true)
 })
 
 test('Kickはbroadcasterバッジの完全一致だけを本人判定に使う', () => {

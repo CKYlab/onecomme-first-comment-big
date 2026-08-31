@@ -2,7 +2,7 @@
   "name": "初コメBIG",
   "author": "onecomme-first-comment-big contributors",
   "link": "https://onecomme.com/docs/feature/templates/",
-  "description": "白背景の縦型欄にコメント本文だけを表示し、初回コメントだけを大きくするテンプレート",
+  "description": "コメント本文を縦表示し、初回コメントだけを大きく表示。ライト／ダーク、フォント、文字サイズ、ツイキャス匿名初コメ設定に対応",
   "width": 1920,
   "height": 1080
 }

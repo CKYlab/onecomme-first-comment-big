@@ -119,6 +119,7 @@
         const settingsEndpoint = 'http://localhost:11180/api/plugins/com.ckylab.first-comment-big-settings'
         const originalFetch = window.fetch.bind(window)
         const settingsVariables = new Set([
+          '--comment-font-family',
           '--panel-background',
           '--comment-text-color',
           '--comment-border-color',
@@ -141,7 +142,13 @@
         }
 
         window.__fixtureSettingsApi = {
-          settings: { theme: 'light', commentFontSize: 32, firstCommentFontSize: 64 },
+          settings: {
+            theme: 'light',
+            fontPreset: 'standard',
+            commentFontSize: 32,
+            firstCommentFontSize: 64,
+            anonymousFirstCommentBig: false,
+          },
           fail: false,
           getCount: 0,
           stopCallCount: 0,
@@ -632,15 +639,11 @@
           const newestFirst = numbers.every(
             (number, index) => number === 30 - index,
           )
-          const fitsVertically =
-            container.scrollHeight <= container.clientHeight ||
-            container.childElementCount === 1
-
           document.documentElement.dataset.viewportFitPass = String(
-            rendered.length > 1 &&
-              rendered.length < comments.length &&
+            rendered.length === comments.length &&
               newestFirst &&
-              fitsVertically &&
+              container.scrollHeight > container.clientHeight &&
+              getComputedStyle(container).overflowY === 'hidden' &&
               rendered.some((element) => element.classList.contains('comment--first')) &&
               rendered.some((element) => element.textContent.includes('長文')),
           )
@@ -649,6 +652,7 @@
         const settingsChecks = [
           ['initial', 'light / 32 / 64'],
           ['dark', 'dark反映'],
+          ['font-preset', '全コメント種別のフォント反映／rounded読込'],
           ['normal-size', '通常文字サイズ変更'],
           ['big-size', 'BIG文字サイズ変更'],
           ['same-settings', '同一設定で再適用なし'],
@@ -660,6 +664,8 @@
           ['first-render', '初コメBIG'],
           ['kick-emote-render', 'Kickエモート'],
           ['owner-render', 'TwitCasting/Kick owner'],
+          ['owner-size', '通常／TwitCasting／Kick owner文字サイズ'],
+          ['anonymous-off-on', '匿名BIG OFF／ON履歴'],
           ['prepend-order', '新着が上、最古が下から削除'],
           ['failure-continuity', 'API失敗後もコメント追加可能'],
           ['ordinary-cleanup', '通常pagehideでGET停止・unsubscribe済み'],
@@ -741,11 +747,18 @@
           try {
             const api = window.__fixtureSettingsApi
             api.fail = false
-            api.set({ theme: 'light', commentFontSize: 32, firstCommentFontSize: 64 })
+            api.set({
+              theme: 'light',
+              fontPreset: 'standard',
+              commentFontSize: 32,
+              firstCommentFontSize: 64,
+              anonymousFirstCommentBig: false,
+            })
             await waitForSettingsTick()
             check(
               'initial',
               cssVariable('--panel-background') === '#ffffff' &&
+                cssVariable('--comment-font-family').startsWith('"Yu Gothic UI"') &&
                 cssVariable('--comment-font-size') === '32px' &&
                 cssVariable('--first-comment-font-size') === '64px',
               `${cssVariable('--panel-background')} / ${cssVariable('--comment-font-size')} / ${cssVariable('--first-comment-font-size')}`,
@@ -788,18 +801,19 @@
             const afterFitCount = container.childElementCount
             const retainedAfterSizeChange = Array.from(container.children)
             const sizeRefitPass =
-              beforeFitCount > 2 &&
-              afterFitCount < beforeFitCount &&
-              !retainedAfterSizeChange.some((element) => element.textContent === oldestBeforeSizeChange) &&
+              beforeFitCount === 100 &&
+              afterFitCount === beforeFitCount &&
+              retainedAfterSizeChange.some((element) => element.textContent === oldestBeforeSizeChange) &&
               retainedAfterSizeChange.some((element) => element.classList.contains('comment--first')) &&
               retainedAfterSizeChange.some((element) => element.textContent.includes('長文保持')) &&
-              container.scrollHeight <= container.clientHeight &&
+              container.scrollHeight > container.clientHeight &&
+              getComputedStyle(container).overflowY === 'hidden' &&
               Number.isInteger(emitCountBeforeSizeChange) &&
               window.__fixtureState.emitCommentsCallCount === emitCountBeforeSizeChange
             check(
               'size-refit',
               sizeRefitPass,
-              `${beforeFitCount} -> ${afterFitCount}; BIG=${retainedAfterSizeChange.some((element) => element.classList.contains('comment--first'))}; long=${retainedAfterSizeChange.some((element) => element.textContent.includes('長文保持'))}; oldestRemoved=${!retainedAfterSizeChange.some((element) => element.textContent === oldestBeforeSizeChange)}; fit=${container.scrollHeight}/${container.clientHeight}; emits=${emitCountBeforeSizeChange}/${window.__fixtureState.emitCommentsCallCount}`,
+              `${beforeFitCount} -> ${afterFitCount}; BIG=${retainedAfterSizeChange.some((element) => element.classList.contains('comment--first'))}; long=${retainedAfterSizeChange.some((element) => element.textContent.includes('長文保持'))}; oldestRetained=${retainedAfterSizeChange.some((element) => element.textContent === oldestBeforeSizeChange)}; clipped=${container.scrollHeight}/${container.clientHeight}; emits=${emitCountBeforeSizeChange}/${window.__fixtureState.emitCommentsCallCount}`,
             )
 
             container.replaceChildren()
@@ -908,13 +922,90 @@
             check('first-render', container.firstElementChild.classList.contains('comment--first') && getComputedStyle(container.firstElementChild).fontSize === '80px')
             document.getElementById('emit-kick-emote').click()
             check('kick-emote-render', Boolean(container.firstElementChild.querySelector('.kick-emote')))
+
+            await updateFixtureSettings({ theme: 'light', commentFontSize: 32, firstCommentFontSize: 64 })
+            container.replaceChildren()
+            emit(normal('設定回帰 通常32→40', false))
+            const normalSizeElement = container.firstElementChild
             document.getElementById('emit-twicas-owner-first').click()
             const twicasOwnerElement = container.firstElementChild
             document.getElementById('emit-kick-owner-emote').click()
+            const kickOwnerElement = container.firstElementChild
             check(
               'owner-render',
               twicasOwnerElement.classList.contains('comment--owner') &&
-                container.firstElementChild.classList.contains('comment--owner'),
+                kickOwnerElement.classList.contains('comment--owner'),
+            )
+            const ownerSizesAt32 = {
+              normal: getComputedStyle(normalSizeElement).fontSize,
+              twicas: getComputedStyle(twicasOwnerElement).fontSize,
+              kick: getComputedStyle(kickOwnerElement).fontSize,
+            }
+            await updateFixtureSettings({ commentFontSize: 40 })
+            const ownerSizesAt40 = {
+              normal: getComputedStyle(normalSizeElement).fontSize,
+              twicas: getComputedStyle(twicasOwnerElement).fontSize,
+              kick: getComputedStyle(kickOwnerElement).fontSize,
+            }
+            check(
+              'owner-size',
+              Object.values(ownerSizesAt32).every((value) => value === '32px') &&
+                Object.values(ownerSizesAt40).every((value) => value === '40px'),
+              `${JSON.stringify(ownerSizesAt32)} -> ${JSON.stringify(ownerSizesAt40)}`,
+            )
+
+            emit(normal('フォント確認BIG', true))
+            const fontBigElement = container.firstElementChild
+            emit(gift({
+              itemName: 'フォント確認gift',
+              speechText: 'フォント確認gift フォント確認gift',
+              isFreeGift: false,
+              price: 100,
+              backgroundColor: '#e2b52b',
+              textColor: '#ffffff',
+            }))
+            const fontGiftElement = container.firstElementChild
+            const giftColorsBeforeFont = inlineColors(fontGiftElement)
+            await updateFixtureSettings({ fontPreset: 'rounded' })
+            const renderedFontFamilies = {
+              normal: getComputedStyle(normalSizeElement).fontFamily,
+              first: getComputedStyle(fontBigElement).fontFamily,
+              twicasOwner: getComputedStyle(twicasOwnerElement).fontFamily,
+              kickOwner: getComputedStyle(kickOwnerElement).fontFamily,
+              gift: getComputedStyle(fontGiftElement).fontFamily,
+            }
+            await updateFixtureSettings({ fontPreset: 'standard' })
+            await updateFixtureSettings({ fontPreset: 'rounded' })
+            const roundedFontStylesheets = document.querySelectorAll(
+              '#first-comment-big-rounded-font',
+            )
+            check(
+              'font-preset',
+              Object.values(renderedFontFamilies).every(
+                (value) => value.includes('M PLUS Rounded 1c'),
+              ) &&
+                JSON.stringify(inlineColors(fontGiftElement)) ===
+                  JSON.stringify(giftColorsBeforeFont) &&
+                roundedFontStylesheets.length === 1 &&
+                roundedFontStylesheets[0].getAttribute('href') ===
+                  'https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700&display=swap',
+              `${JSON.stringify(renderedFontFamilies)} / links=${roundedFontStylesheets.length}`,
+            )
+
+            await updateFixtureSettings({ anonymousFirstCommentBig: false })
+            emit(anonymous('匿名OFF初回', '匿名コメント#5000'))
+            const anonymousOff = container.firstElementChild
+            await updateFixtureSettings({ anonymousFirstCommentBig: true })
+            emit(anonymous('匿名ON後の既観測', '匿名コメント#5000'))
+            const anonymousObservedAfterOn = container.firstElementChild
+            emit(anonymous('匿名ON新規', '匿名コメント#6000'))
+            const anonymousNewAfterOn = container.firstElementChild
+            check(
+              'anonymous-off-on',
+              !anonymousOff.classList.contains('comment--first') &&
+                !anonymousObservedAfterOn.classList.contains('comment--first') &&
+                anonymousNewAfterOn.classList.contains('comment--first'),
+              `${anonymousOff.className} / ${anonymousObservedAfterOn.className} / ${anonymousNewAfterOn.className}`,
             )
 
             container.replaceChildren()
@@ -922,8 +1013,8 @@
             check(
               'prepend-order',
               container.firstElementChild.textContent === '順序105' &&
-                container.lastElementChild.textContent !== '順序1' &&
-                container.childElementCount < 105,
+                container.lastElementChild.textContent === '順序6' &&
+                container.childElementCount === 100,
               `${container.firstElementChild.textContent} / ${container.lastElementChild.textContent} / ${container.childElementCount}`,
             )
 

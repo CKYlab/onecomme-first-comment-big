@@ -4,7 +4,7 @@
 
 「初コメBIG」に、わんコメ公式プラグイン機構を使った設定機能を追加する。設定はプラグインの defaultState / store に永続保存し、テンプレートはプラグイン専用REST APIを500ms間隔でGETする。ローカルAPIが通常応答する条件では、保存後の次回ポーリングから最大約0.5秒でOBS表示へ反映する。OBSブラウザソースの再読み込みは不要とする。
 
-本設計で扱う設定は、テーマ、通常コメント文字サイズ、初コメ文字サイズの3項目だけである。本書は実装前の設計を確定するものであり、本書作成時点ではプラグイン、テンプレート、テスト、Probe、RAW、ZIP、distを変更しない。
+初期設計の3項目へ、実機検証後の独立タスクでフォントプリセットとTwitCasting匿名初コメBIG設定を追加し、現在は5項目を扱う。本書は実装済みの契約と実機確認結果を記録する。名前表示、アイコン表示、初コメBIG全体のON/OFF、自由色指定などは扱わない。
 
 ## 2. 採用方式
 
@@ -37,19 +37,23 @@ localStorage共有、設定ファイルの直接読み書き、WebSocketによ�
 
     {
       "theme": "light",
+      "fontPreset": "standard",
       "commentFontSize": 32,
-      "firstCommentFontSize": 64
+      "firstCommentFontSize": 64,
+      "anonymousFirstCommentBig": false
     }
 
 | キー | 型 | 既定値 | 受理する値 |
 | --- | --- | ---: | --- |
 | theme | string | light | light または dark |
+| fontPreset | string | standard | standard、meiryo、biz-ud、rounded |
 | commentFontSize | number | 32 | 16以上64以下の有限な整数 |
 | firstCommentFontSize | number | 64 | 24以上128以下の有限な整数 |
+| anonymousFirstCommentBig | boolean | false | booleanのtrueだけをONとして受理 |
 
 正規化は項目ごとに行う。不正な1項目が、ほかの妥当な項目を無効にしてはならない。欠落値と不正値はその項目の既定値へ戻し、未知キーは保存結果と応答から除外する。
 
-文字サイズは typeof value === 'number'、Number.isFinite(value)、Number.isInteger(value)、範囲内の全条件を満たす場合だけ受理する。数値文字列、空文字列、NaN、Infinity、小数、範囲外、不正文字列は受理しない。themeは完全一致だけを受理し、大文字小文字変換や未知名からの推測をしない。
+文字サイズは typeof value === 'number'、Number.isFinite(value)、Number.isInteger(value)、範囲内の全条件を満たす場合だけ受理する。数値文字列、空文字列、NaN、Infinity、小数、範囲外、不正文字列は受理しない。themeとfontPresetは許可値の完全一致だけを受理し、大文字小文字変換や未知名からの推測をしない。anonymousFirstCommentBigはbooleanのtrueだけをtrueとし、それ以外はfalseへ戻す。
 
 プラグイン側と設定画面側は同じ規則で検証する。信頼境界であるプラグイン側の検証を正とし、ブラウザ側の検証は早期フィードバックのために重ねて行う。
 
@@ -93,7 +97,7 @@ localStorage共有、設定ファイルの直接読み書き、WebSocketによ�
 
 ### 5.3 状態初期化
 
-起動時に store.store を正規化する。未保存、旧形式、不正値、余分なキーがある場合は完全な正規化済みオブジェクトへ置き換える。保存前後の比較は3項目の値で行い、同一なら不要なストア書き込みをしない。正規化関数は入力を変更せず、新しいオブジェクトを返す。
+起動時に store.store を正規化する。未保存、旧3項目形式、不正値、余分なキーがある場合は完全な5項目の正規化済みオブジェクトへ置き換える。保存前後の比較は5項目の値で行い、同一なら不要なストア書き込みをしない。正規化関数は入力を変更せず、新しいオブジェクトを返す。
 
 ### 5.4 REST API
 
@@ -123,17 +127,24 @@ PUT:
     テーマ
     [ ライト ▼ ]
 
+    フォント
+    [ 標準（游ゴシック） ▼ ]
+
     通常コメント文字サイズ
     [ 32 ▲▼ ] px
 
     初コメ文字サイズ
     [ 64 ▲▼ ] px
 
+    [ ] ツイキャス匿名コメントも初コメBIG
+
     [ 保存 ]
 
 - テーマはselectとし、値light/dark、表示「ライト」/「ダーク」とする。
+- フォントはselectとし、standard／meiryo／biz-ud／roundedを保存する。表示は「標準（游ゴシック）」「メイリオ」「太ゴシック（BIZ UDPゴシック）」「丸ゴシック（M PLUS Rounded 1c）」とする。
 - 通常文字サイズは input type="number" min="16" max="64" step="1" とする。
 - 初コメ文字サイズは input type="number" min="24" max="128" step="1" とする。
+- TwitCasting匿名初コメBIGはcheckboxのchecked booleanとして扱い、既定はOFFとする。
 - 初期表示時にGETし、成功時は正規化値をフォームへ反映する。
 - 初期GET失敗時は既定値を表示し、取得失敗を画面内へ表示する。
 - 保存時はnumber入力を valueAsNumber で数値として読み、ブラウザ側で検証してから完全な設定オブジェクトをPUTする。input.valueの文字列をそのままAPIへ渡さない。
@@ -147,11 +158,11 @@ PUT:
 
 ### 7.1 モジュール境界
 
-後続実装で template/first-comment-big/settings-client.js を追加し、ブラウザとNodeテストの両方で使える依存なしモジュールとする。index.htmlはこれをscript.jsの前に読み込む。
+template/first-comment-big/settings-client.js は、ブラウザとNodeテストの両方で使える依存なしモジュールとする。index.htmlはこれをscript.jsの前に読み込む。
 
-設定クライアントの責務は、RESTポーリング、応答正規化、前回値との比較、CSS変数の差分更新、表示領域再調整要求、停止処理だけとする。初コメ判定、コメントモデル、gift判定、DOM生成、OneSDK初期化・購読・解除は移さない。
+設定クライアントの責務は、RESTポーリング、応答正規化、前回値との比較、CSS変数の差分更新、roundedフォントの必要時読込、現在設定の通知、表示領域再調整要求、停止処理とする。初コメ判定、コメントモデル、gift判定、コメントDOM生成、OneSDK初期化・購読・解除は移さない。
 
-設定クライアント生成時に、CSS変数を設定するルート要素と、変更完了時のコールバックを注入する。script.jsは既存fitCommentsToViewport関数をそのコールバックとして渡す。設定クライアントからscript.jsの非公開関数をグローバル公開せず、Nodeテストではスパイ関数を注入して呼び出し回数と順序を検証する。
+設定クライアント生成時に、CSS変数を設定するルート要素、fitCommentsToViewport、任意のonSettingsChangedを注入する。script.jsはonSettingsChangedで完全設定を保持し、コメント判定時にanonymousFirstCommentBigだけをコアへ渡す。設定クライアントからscript.jsの非公開関数をグローバル公開せず、Nodeテストではスパイ関数を注入して呼び出し回数と順序を検証する。通知先の例外は設定ポーリングへ伝播させない。
 
 ### 7.2 ポーリングと反映
 
@@ -163,7 +174,7 @@ PUT:
 
 ### 7.3 フォールバック
 
-次の場合、取得結果全体を light / 32 / 64 として処理する。
+次の場合、取得結果全体を light / standard / 32 / 64 / 匿名BIG OFFとして処理する。
 
 - プラグインが未導入、無効、起動前
 - fetch失敗、HTTPエラー
@@ -176,22 +187,25 @@ PUT:
 
 ### 7.4 CSS変数の差分適用
 
-初期適用値は既存CSSと同じ light / 32 / 64 とする。前回適用値を保持し、変わった項目に対応する変数だけをdocument.documentElement.style.setPropertyで更新する。
+初期適用値は既存CSSと同じ light / standard / 32 / 64 / 匿名BIG OFFとする。前回適用値を保持し、変わった視覚項目に対応する変数だけをdocument.documentElement.style.setPropertyで更新する。
 
 | 設定 | 更新するCSS変数 |
 | --- | --- |
-| light | --panel-background: #ffffff、--comment-text-color: #000000、--comment-border-color: #d8d8d8 |
-| dark | --panel-background: #0b0b0b、--comment-text-color: #ffffff、--comment-border-color: #333333 |
+| light | --panel-background: #ffffff、--comment-text-color: #000000、--comment-border-color: #d8d8d8、--gift-neutral-background: #ffffff、--gift-neutral-text-color: #000000 |
+| dark | --panel-background: #0b0b0b、--comment-text-color: #ffffff、--comment-border-color: #333333、--gift-neutral-background: #222222、--gift-neutral-text-color: #ffffff |
+| fontPreset | --comment-font-family: 許可済みの固定font stack |
 | commentFontSize | --comment-font-size: 整数px |
 | firstCommentFontSize | --first-comment-font-size: 整数px |
 
-同じ設定の再取得ではsetPropertyを呼ばず、表示領域も再調整しない。1回の取得で1項目以上変わった場合は、全変数の更新後に既存fitCommentsToViewport()を1回だけ呼ぶ。文字サイズ増加後の古いコメント削除は既存の高さベース規則へ委ねる。
+同じ設定の再取得ではsetProperty、設定通知、表示領域再調整を行わない。テーマ、フォント、文字サイズのいずれかが変わった場合は、全変数の更新後に既存fitCommentsToViewport()を1回だけ呼ぶ。anonymousFirstCommentBigだけの変更ではCSSとfitを変更せず、現在設定だけを通知する。
+
+roundedを選択した時だけ、固定ID `first-comment-big-rounded-font` のstylesheet要素を追加し、Google Fontsの `M PLUS Rounded 1c` 太さ700を読み込む。要素が既にあれば再追加せず、roundedから別presetへ戻した後に再選択しても1個のままとする。DOM操作またはネットワーク取得に失敗しても例外をコメント処理へ伝播させず、固定font stackのBIZ UDPゴシック、游ゴシックなどへフォールバックする。他の3presetでは外部フォントを読み込まない。
 
 ### 7.5 gift色の保護
 
-TwitCasting giftとKick BASIC / LEVEL_UP giftは、既存処理が各コメント要素へ設定するstyle.backgroundColorとstyle.colorを維持する。テーマ適用はルートの5つのCSS変数だけを変更し、要素のインラインスタイルを削除・更新しない。
+有効なOneSDK固有色を持つTwitCasting giftとKick BASIC / LEVEL_UP giftは、既存処理が各コメント要素へ設定するstyle.backgroundColorとstyle.colorを維持する。TwitCasting無料giftと、有料giftで有効色が欠落した場合はneutral gift用CSS変数を参照し、lightでは白背景・黒文字、darkでは#222222背景・白文字へ追従する。Kick giftの既存fallback色は変更しない。
 
-gift背景色・文字色をテーマCSSで指定せず、important指定でインライン色を上書きする規則も追加しない。共通の区切り線はテーマ変数へ従うが、gift固有の背景色と文字色はテーマ変更の影響を受けない。
+gift固有色をimportant指定で上書きする規則は追加しない。共通の区切り線とneutral giftだけがテーマ変数へ従い、有効なgift固有背景色・文字色はテーマ変更の影響を受けない。
 
 ### 7.6 停止
 
@@ -205,29 +219,31 @@ gift背景色・文字色をテーマCSSで指定せず、important指定でイ�
 
 ## 8. 既存機能との非干渉
 
-後続実装では次を変更しない。
+実装では次を変更しない。
 
 - 通常ユーザーのisFirstTime判定
-- TwitCasting匿名履歴
+- 通常ユーザーのisFirstTime判定とTwitCasting匿名履歴の保存形式・最大15配信
 - gift優先順位とgiftの初コメBIG除外
 - TwitCasting gift処理
 - Kick BASIC / LEVEL_UP gift処理
 - Kickエモート処理
 - TwitCasting/Kick配信者本人判定
 - textContent、テキストノード、URL検証などのHTML安全化
-- 新着を先頭へ追加し、古いコメントを下端から削除する表示順
-- scrollHeightとclientHeight、安全上限による高さベース削除
+- 新着を先頭へ追加し、古いコメントを下方向へ並べる表示順
+- 最大100件を超えた場合だけ最古コメントを削除し、高さ超過分はoverflow-y:hiddenでクリップする表示規則
 
-設定変更後に既存fitCommentsToViewport()を呼べるようにする以外、コメント処理フローへ設定分岐を入れない。
+TwitCasting匿名は設定OFFでも必ずhistory.rememberを行う。OFF中に観測した匿名は後からONにしてもBIGへ戻さず、ON中の未観測匿名だけをBIGとする。giftとownerは設定に関係なく匿名履歴を消費しない。これ以外のコメント処理フローへ設定分岐を入れない。
 
 ## 9. テスト設計
 
-既存Nodeテスト70件を維持し、次を追加する。
+既存Nodeテストを維持し、次を自動検証する。
 
 ### 9.1 正規化
 
 - light/darkを受理する。
 - 不明theme、型違い、欠落themeをlightへ戻す。
+- 4つのfontPresetを受理し、不明値をstandardへ戻す。
+- anonymousFirstCommentBigはboolean trueだけを受理する。
 - 通常文字サイズ16/32/64を受理する。
 - 通常文字サイズ15/65/NaN/Infinity/小数/数値文字列/不正文字列を32へ戻す。
 - 初コメ文字サイズ24/64/128を受理する。
@@ -253,6 +269,9 @@ gift背景色・文字色をテーマCSSで指定せず、important指定でイ�
 - 同一設定の再取得でCSSとfitCommentsToViewport()を再適用しない。
 - 各設定の変更で対象変数だけを更新する。
 - 変更後、全変数適用後にfitCommentsToViewport()を1回実行する。
+- rounded選択時だけ指定Google Fonts stylesheetを1個追加し、再選択でも重複させない。
+- stylesheet取得失敗後もポーリングとコメント表示を継続する。
+- anonymousFirstCommentBigだけの変更ではCSSとfitを再適用しない。
 - 要求中の次tickで重複GETしない。
 - pagehide/disposeでポーリングと進行中要求を停止する。
 - 複数回停止しても例外にならず、停止後の応答を適用しない。
@@ -262,8 +281,10 @@ gift背景色・文字色をテーマCSSで指定せず、important指定でイ�
 - light / 32 / 64の初期表示。
 - darkが再読み込みなしで反映される。
 - 2つの文字サイズが独立して反映される。
+- 4種類のフォントが通常、BIG、gift、ownerへ継承される。
+- 匿名BIGのOFF／ON切替と、OFF中に記録した既観測匿名が通常表示のままであること。
 - 同一設定で不要な再調整をしない。
-- BIGや長文の文字サイズ変更後も縦方向へ収まる。
+- BIGや長文を含む高さ超過分がクリップされ、既存DOMを失わない。
 - TwitCasting/Kick giftの背景色と文字色がテーマ変更前後で同じである。
 - 通常コメント、初コメBIG、gift、Kickエモート、配信者本人、表示順が既存どおりである。
 - 設定API失敗後も新しいコメントが表示される。
@@ -272,16 +293,16 @@ gift背景色・文字色をテーマCSSで指定せず、important指定でイ�
 
 ### 9.5 回帰検証
 
-実装時にnpm test、全JavaScriptへのnode --check、git diff --checkを実行する。既存70件がすべて成功すること、設定処理がOneSDK購読解除を呼ばないこと、テーマが5つの既存CSS変数以外を変更しないこと、giftのインライン色を上書きしないことを差分レビューする。
+実装時にnpm test、全JavaScriptへのnode --check、git diff --check、ブラウザfixtureを実行する。全テストが成功すること、設定処理がOneSDK購読解除を呼ばないこと、giftの固有インライン色を上書きしないこと、rounded以外で外部フォント要素を作らないことを差分レビューする。
 
 ## 10. 障害境界と安全性
 
 - fetch、HTTP判定、JSON解析、正規化、CSS適用の例外をコメント購読へ伝播させない。
 - 設定障害をOneSDK初期化失敗として扱わず、購読を解除しない。
 - APIへコメント、ユーザー、配信データを送らない。
-- PUTは既知の3項目だけを保存し、未知キーやプロトタイプをコピーしない。
+- PUTは既知の5項目だけを保存し、未知キーやプロトタイプをコピーしない。
 - 設定値からHTMLを生成せず、設定画面はtextContentまたはフォームvalueを使う。
-- 公式localhostエンドポイントだけを使用し、外部へ設定を送らない。
+- 設定APIは公式localhostエンドポイントだけを使用し、外部へ設定を送らない。rounded選択時だけ指定したGoogle Fonts stylesheetを取得する。
 
 ## 11. 非目標
 
@@ -291,24 +312,24 @@ gift背景色・文字色をテーマCSSで指定せず、important指定でイ�
 - サービス別テーマ
 - OSダークモード自動追従
 - カラーピッカー
-- フォント変更
+- 任意フォント入力、追加Webフォント、複数weight
 - WebSocketによるpush通知
 - 既存判定、匿名履歴、gift、エモート、配信者本人、安全化、表示順の変更
 - 配布ZIP生成
 - 正式配布、タグ、Release
 
-## 12. 後続実装の完了条件
+## 12. 実装の完了条件
 
-1. プラグインが3項目だけを公式ストアへ正規化して永続保存する。
+1. プラグインが5項目だけを公式ストアへ正規化して永続保存する。
 2. 設定画面がGET/PUTを使い、ブラウザとプラグインの両方で検証する。
 3. テンプレートが500ms間隔で取得し、通常条件で保存後最大約0.5秒から更新する。
 4. 同一値ではCSS変数と表示領域を再適用しない。
-5. 変更時に5つの既存CSS変数だけを更新し、fitCommentsToViewport()を1回実行する。
-6. 設定障害でlight / 32px / 64pxへ戻り、コメント表示を継続する。
+5. 視覚設定変更時だけ対応CSS変数を更新し、fitCommentsToViewport()を1回実行する。
+6. 設定障害でlight / standard / 32px / 64px / 匿名BIG OFFへ戻り、コメント表示を継続する。
 7. TwitCasting/Kick giftのイベント固有背景色・文字色を維持する。
 8. pagehide/disposeでポーリングを停止する。
-9. 既存Nodeテスト70件と追加テストがすべて成功する。
-10. 8章の既存ロジックへ機能変更がないことを差分レビューで確認する。
+9. Nodeテスト、ブラウザfixture、全JavaScript構文確認がすべて成功する。
+10. 8章で保護したロジックへ意図しない機能変更がないことを差分レビューで確認する。
 
 入力型、範囲、API応答、フォールバック、反映タイミング、差分適用、停止処理、gift色の優先順位はすべて本書で確定した。
 
@@ -322,8 +343,13 @@ gift背景色・文字色をテーマCSSで指定せず、important指定でイ�
 - プラグインを再度ONにすると、保存済み設定へ戻る。
 - 設定画面からlight / darkを保存すると、OBSブラウザソースを再読み込みせず反映される。
 - 通常コメント文字サイズと初コメ文字サイズの変更が、その場で反映される。
+- 4種類のフォントプリセットがその場で反映される。
+- roundedでは、PCにM PLUS Rounded 1cが未導入でもGoogle Fontsから必要時に読み込んで表示される。
+- TwitCasting匿名BIGのON/OFFがその場で反映され、OFF中に観測した匿名はON後も通常表示、ON中の未観測匿名だけがBIGになる。
+- 初コメBIG通過後も表示下部へ大きな空白が残らず、DOM最大100件を維持する。
+- neutral giftはdarkテーマへ追従し、有効なgift固有色とowner表示は維持される。
 - 設定の保存、プラグインのON/OFF、設定反映中もコメント表示が継続する。
 
 実機確認中に判明したREST境界の問題は、`95771df`（PUTの解析済みbody対応）、`0b98250`（設定画面のREST response envelope対応）、`d50430a`（テンプレート設定クライアントのREST response envelope対応）で修正済みである。
 
-ダークテーマ時の無料gift配色、任意背景色、任意文字色、その他のテーマエディタ機能は今回変更していない。無料giftのダークテーマ対応は独立した後続タスクとして扱う。
+ダークテーマ時のneutral gift配色は独立タスクで実装・検証済みである。任意背景色、任意文字色、その他のテーマエディタ機能は追加していない。

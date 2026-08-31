@@ -16,6 +16,14 @@
           <option value="dark">ダーク</option>
         </select>
 
+        <label for="font-preset">フォント</label>
+        <select id="font-preset" name="fontPreset">
+          <option value="standard">標準（游ゴシック）</option>
+          <option value="meiryo">メイリオ</option>
+          <option value="biz-ud">太ゴシック（BIZ UDPゴシック）</option>
+          <option value="rounded">丸ゴシック（M PLUS Rounded 1c）</option>
+        </select>
+
         <label for="comment-font-size">通常コメント文字サイズ</label>
         <span>
           <input
@@ -43,6 +51,15 @@
           />
           px
         </span>
+
+        <label class="checkbox" for="anonymous-first-comment-big">
+          <input
+            id="anonymous-first-comment-big"
+            name="anonymousFirstCommentBig"
+            type="checkbox"
+          />
+          ツイキャス匿名コメントも初コメBIG
+        </label>
 
         <button id="save" type="submit">保存</button>
         <p id="status" role="status" aria-live="polite"></p>

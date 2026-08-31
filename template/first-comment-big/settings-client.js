@@ -8,9 +8,21 @@
 
   const DEFAULT_SETTINGS = Object.freeze({
     theme: 'light',
+    fontPreset: 'standard',
     commentFontSize: 32,
     firstCommentFontSize: 64,
+    anonymousFirstCommentBig: false,
   })
+
+  const FONT_PRESETS = Object.freeze({
+    standard: '"Yu Gothic UI", "Yu Gothic", Meiryo, sans-serif',
+    meiryo: 'Meiryo, "Yu Gothic UI", "Yu Gothic", sans-serif',
+    'biz-ud': '"BIZ UDPGothic", "Yu Gothic UI", Meiryo, sans-serif',
+    rounded: '"M PLUS Rounded 1c", "BIZ UDPGothic", "Yu Gothic UI", Meiryo, sans-serif',
+  })
+  const ROUNDED_FONT_STYLESHEET_ID = 'first-comment-big-rounded-font'
+  const ROUNDED_FONT_STYLESHEET_URL =
+    'https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700&display=swap'
 
   const THEME_COLORS = Object.freeze({
     light: Object.freeze({
@@ -46,24 +58,54 @@
       : {}
     return {
       theme: source.theme === 'dark' ? 'dark' : 'light',
+      fontPreset: Object.prototype.hasOwnProperty.call(FONT_PRESETS, source.fontPreset)
+        ? source.fontPreset
+        : 'standard',
       commentFontSize: validInteger(source.commentFontSize, 16, 64)
         ? source.commentFontSize
         : 32,
       firstCommentFontSize: validInteger(source.firstCommentFontSize, 24, 128)
         ? source.firstCommentFontSize
         : 64,
+      anonymousFirstCommentBig: source.anonymousFirstCommentBig === true,
     }
   }
 
   function settingsEqual(a, b) {
     return Boolean(a && b) &&
       a.theme === b.theme &&
+      a.fontPreset === b.fontPreset &&
       a.commentFontSize === b.commentFontSize &&
-      a.firstCommentFontSize === b.firstCommentFontSize
+      a.firstCommentFontSize === b.firstCommentFontSize &&
+      a.anonymousFirstCommentBig === b.anonymousFirstCommentBig
   }
 
   function isSettingsResponse(value) {
     return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+  }
+
+  function ensureRoundedFontLoaded(rootElement) {
+    const document = rootElement && rootElement.ownerDocument
+    if (
+      !document ||
+      typeof document.getElementById !== 'function' ||
+      typeof document.createElement !== 'function' ||
+      !document.head ||
+      typeof document.head.append !== 'function'
+    ) {
+      return
+    }
+
+    try {
+      if (document.getElementById(ROUNDED_FONT_STYLESHEET_ID)) return
+      const stylesheet = document.createElement('link')
+      stylesheet.id = ROUNDED_FONT_STYLESHEET_ID
+      stylesheet.rel = 'stylesheet'
+      stylesheet.href = ROUNDED_FONT_STYLESHEET_URL
+      document.head.append(stylesheet)
+    } catch {
+      // Font loading must never interrupt settings polling or comment display.
+    }
   }
 
   function createSettingsClient(options) {
@@ -75,6 +117,7 @@
       clearIntervalImpl = globalThis.clearInterval.bind(globalThis),
       AbortControllerImpl = globalThis.AbortController,
       warn = globalThis.console.warn.bind(globalThis.console),
+      onSettingsChanged,
       endpoint = DEFAULT_ENDPOINT,
       pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
     } = options
@@ -89,7 +132,8 @@
     let lastApplied = { ...DEFAULT_SETTINGS }
 
     function applySettings(next) {
-      let changed = false
+      if (settingsEqual(next, lastApplied)) return
+      let visualChanged = false
 
       if (next.theme !== lastApplied.theme) {
         const colors = THEME_COLORS[next.theme]
@@ -98,20 +142,35 @@
         rootElement.style.setProperty('--comment-border-color', colors.commentBorderColor)
         rootElement.style.setProperty('--gift-neutral-background', colors.giftNeutralBackground)
         rootElement.style.setProperty('--gift-neutral-text-color', colors.giftNeutralTextColor)
-        changed = true
+        visualChanged = true
+      }
+      if (next.fontPreset !== lastApplied.fontPreset) {
+        if (next.fontPreset === 'rounded') ensureRoundedFontLoaded(rootElement)
+        rootElement.style.setProperty('--comment-font-family', FONT_PRESETS[next.fontPreset])
+        visualChanged = true
       }
       if (next.commentFontSize !== lastApplied.commentFontSize) {
         rootElement.style.setProperty('--comment-font-size', `${next.commentFontSize}px`)
-        changed = true
+        visualChanged = true
       }
       if (next.firstCommentFontSize !== lastApplied.firstCommentFontSize) {
         rootElement.style.setProperty('--first-comment-font-size', `${next.firstCommentFontSize}px`)
-        changed = true
+        visualChanged = true
       }
 
-      if (!changed) return
       lastApplied = { ...next }
-      fitCommentsToViewport()
+      if (typeof onSettingsChanged === 'function') {
+        try {
+          onSettingsChanged({ ...next })
+        } catch (error) {
+          try {
+            warn('[初コメBIG] 設定変更通知の処理に失敗しました。', error)
+          } catch {
+            // A custom logger must not stop polling after a callback failure.
+          }
+        }
+      }
+      if (visualChanged) fitCommentsToViewport()
     }
 
     function handleFailure(error) {

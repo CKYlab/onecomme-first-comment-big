@@ -13,6 +13,9 @@
   let disposed = false
   let subscriberId = null
   let settingsClient = null
+  let runtimeSettings = settingsClientFactory && settingsClientFactory.DEFAULT_SETTINGS
+    ? { ...settingsClientFactory.DEFAULT_SETTINGS }
+    : { anonymousFirstCommentBig: false }
 
   function warnStorage(message, error) {
     console.warn(message, error)
@@ -43,12 +46,6 @@
     while (container.childElementCount > MAX_COMMENT_ELEMENTS) {
       container.lastElementChild.remove()
     }
-    while (
-      container.childElementCount > 1 &&
-      container.scrollHeight > container.clientHeight
-    ) {
-      container.lastElementChild.remove()
-    }
     container.scrollTop = 0
   }
 
@@ -67,6 +64,9 @@
       settingsClient = settingsClientFactory.createSettingsClient({
         rootElement: document.documentElement,
         fitCommentsToViewport,
+        onSettingsChanged(next) {
+          runtimeSettings = { ...next }
+        },
       })
       void settingsClient.start().catch((error) => {
         console.warn(
@@ -235,7 +235,9 @@
             data: { ...comment.data, comment: kickPresentation.fallbackText },
           }
         : comment
-      const model = core.createDisplayModel(modelInput, history)
+      const model = core.createDisplayModel(modelInput, history, {
+        anonymousFirstCommentBig: runtimeSettings.anonymousFirstCommentBig,
+      })
       if (model) renderModel(model, comment, kickPresentation, kickGift)
     }
   }

@@ -22,8 +22,10 @@ function loadPlugin() {
 
 const defaults = {
   theme: 'light',
+  fontPreset: 'standard',
   commentFontSize: 32,
   firstCommentFontSize: 64,
+  anonymousFirstCommentBig: false,
 }
 
 test('メタデータが設計値と一致しpermissionsが空である', () => {
@@ -54,7 +56,7 @@ test('defaultStateが完全な既定設定である', () => {
 })
 
 test('initがstore.storeの保存済み設定を正規化し既に正規形なら書き込まない', () => {
-  const saved = { theme: 'dark', commentFontSize: 40, firstCommentFontSize: 80 }
+  const saved = { ...defaults, theme: 'dark', fontPreset: 'rounded', commentFontSize: 40, firstCommentFontSize: 80, anonymousFirstCommentBig: true }
   const store = makeStore(saved)
 
   loadPlugin().init({ store })
@@ -66,7 +68,7 @@ test('initがstore.storeの保存済み設定を正規化し既に正規形な�
 test('initialDataを永続設定へ使用せずstoreの保存済み設定を維持する', () => {
   for (const initialData of [{}, { waitingList: ['unrelated'] }]) {
     const plugin = loadPlugin()
-    const saved = { theme: 'dark', commentFontSize: 40, firstCommentFontSize: 80 }
+    const saved = { ...defaults, theme: 'dark', fontPreset: 'rounded', commentFontSize: 40, firstCommentFontSize: 80, anonymousFirstCommentBig: true }
     const store = makeStore(saved)
 
     plugin.init({ store }, initialData)
@@ -74,6 +76,21 @@ test('initialDataを永続設定へ使用せずstoreの保存済み設定を維�
     assert.deepEqual(store.snapshot(), saved)
     assert.equal(store.writes(), 0)
   }
+})
+
+test('initが旧3項目storeへ新2項目の既定値を補って正規形へ修復する', () => {
+  const store = makeStore({ theme: 'dark', commentFontSize: 40, firstCommentFontSize: 80 })
+
+  loadPlugin().init({ store })
+
+  assert.deepEqual(store.snapshot(), {
+    theme: 'dark',
+    fontPreset: 'standard',
+    commentFontSize: 40,
+    firstCommentFontSize: 80,
+    anonymousFirstCommentBig: false,
+  })
+  assert.equal(store.writes(), 1)
 })
 
 test('GETが完全な正規化設定を返し不正なstoreを一度だけ修復する', async () => {
@@ -115,10 +132,10 @@ test('PUTがJSON解析と項目別正規化を行い完全設定を保存して�
 
   const result = await plugin.request({
     method: 'PUT',
-    body: JSON.stringify({ theme: 'dark', commentFontSize: 40, firstCommentFontSize: 999, extra: true }),
+    body: JSON.stringify({ theme: 'dark', fontPreset: 'biz-ud', commentFontSize: 40, firstCommentFontSize: 999, anonymousFirstCommentBig: true, extra: true }),
   })
 
-  const expected = { theme: 'dark', commentFontSize: 40, firstCommentFontSize: 64 }
+  const expected = { theme: 'dark', fontPreset: 'biz-ud', commentFontSize: 40, firstCommentFontSize: 64, anonymousFirstCommentBig: true }
   assert.deepEqual(result, { code: 200, response: expected })
   assert.deepEqual(store.snapshot(), expected)
   assert.equal(store.writes(), 1)
@@ -128,8 +145,8 @@ test('plain ObjectのPUTを受理し同一設定ではstore setterを増やさ�
   const store = makeStore({ ...defaults })
   const plugin = loadPlugin()
   plugin.init({ store })
-  const body = { theme: 'dark', commentFontSize: 40, firstCommentFontSize: 80 }
-  const expected = { theme: 'dark', commentFontSize: 40, firstCommentFontSize: 80 }
+  const body = { theme: 'dark', fontPreset: 'rounded', commentFontSize: 40, firstCommentFontSize: 80, anonymousFirstCommentBig: true }
+  const expected = { ...body }
 
   const firstResult = await plugin.request({ method: 'PUT', body })
 
@@ -145,7 +162,7 @@ test('plain ObjectのPUTを受理し同一設定ではstore setterを増やさ�
 })
 
 test('同一設定のPUTがstore setterを増やさない', async () => {
-  const store = makeStore({ theme: 'dark', commentFontSize: 40, firstCommentFontSize: 80 })
+  const store = makeStore({ ...defaults, theme: 'dark', fontPreset: 'meiryo', commentFontSize: 40, firstCommentFontSize: 80, anonymousFirstCommentBig: true })
   const plugin = loadPlugin()
   plugin.init({ store })
 
@@ -155,7 +172,7 @@ test('同一設定のPUTがstore setterを増やさない', async () => {
 })
 
 test('構文不正JSONがcode 400で直前状態を維持する', async () => {
-  const saved = { theme: 'dark', commentFontSize: 40, firstCommentFontSize: 80 }
+  const saved = { ...defaults, theme: 'dark', fontPreset: 'rounded', commentFontSize: 40, firstCommentFontSize: 80, anonymousFirstCommentBig: true }
   const store = makeStore(saved)
   const plugin = loadPlugin()
   plugin.init({ store })
@@ -169,7 +186,7 @@ test('構文不正JSONがcode 400で直前状態を維持する', async () => {
 
 test('PUTのnull、配列、文字列は全項目を既定値へ正規化する', async () => {
   for (const body of ['null', '[]', '"string"']) {
-    const store = makeStore({ theme: 'dark', commentFontSize: 40, firstCommentFontSize: 80 })
+    const store = makeStore({ ...defaults, theme: 'dark', fontPreset: 'rounded', commentFontSize: 40, firstCommentFontSize: 80, anonymousFirstCommentBig: true })
     const plugin = loadPlugin()
     plugin.init({ store })
 
@@ -183,7 +200,7 @@ test('PUTのnull、配列、文字列は全項目を既定値へ正規化する'
 
 test('GETとPUT以外のPOSTとDELETEは404で状態を変更しない', async () => {
   for (const method of ['POST', 'DELETE']) {
-    const saved = { theme: 'dark', commentFontSize: 40, firstCommentFontSize: 80 }
+    const saved = { ...defaults, theme: 'dark', fontPreset: 'rounded', commentFontSize: 40, firstCommentFontSize: 80, anonymousFirstCommentBig: true }
     const store = makeStore(saved)
     const plugin = loadPlugin()
     plugin.init({ store })

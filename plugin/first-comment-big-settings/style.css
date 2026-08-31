@@ -51,6 +51,17 @@ input {
   width: 7rem;
 }
 
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.checkbox input {
+  width: auto;
+  min-height: auto;
+}
+
 button {
   margin-top: 1rem;
   color: #fff;

@@ -10,10 +10,12 @@ function isCanonicalSettings(value, normalized) {
   return Boolean(value) &&
     typeof value === 'object' &&
     !Array.isArray(value) &&
-    Object.keys(value).length === 3 &&
+    Object.keys(value).length === 5 &&
     Object.hasOwn(value, 'theme') &&
+    Object.hasOwn(value, 'fontPreset') &&
     Object.hasOwn(value, 'commentFontSize') &&
     Object.hasOwn(value, 'firstCommentFontSize') &&
+    Object.hasOwn(value, 'anonymousFirstCommentBig') &&
     settingsEqual(value, normalized)
 }
 

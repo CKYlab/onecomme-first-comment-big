@@ -14,9 +14,21 @@ const LIVE_TEMPLATE_SCRIPT = fs.readFileSync(
 
 const DEFAULT_SETTINGS = {
   theme: 'light',
+  fontPreset: 'standard',
   commentFontSize: 32,
   firstCommentFontSize: 64,
+  anonymousFirstCommentBig: false,
 }
+
+const FONT_FAMILIES = {
+  standard: '"Yu Gothic UI", "Yu Gothic", Meiryo, sans-serif',
+  meiryo: 'Meiryo, "Yu Gothic UI", "Yu Gothic", sans-serif',
+  'biz-ud': '"BIZ UDPGothic", "Yu Gothic UI", Meiryo, sans-serif',
+  rounded: '"M PLUS Rounded 1c", "BIZ UDPGothic", "Yu Gothic UI", Meiryo, sans-serif',
+}
+
+const ROUNDED_FONT_STYLESHEET_URL =
+  'https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700&display=swap'
 
 function responseWith(body, { ok = true } = {}) {
   return {
@@ -51,6 +63,10 @@ function makeLiveTemplateHarness({
   settingsStop,
   oneSDKReady,
   oneSDKUnsubscribe,
+  containerClientHeight = 0,
+  createDisplayModel = () => null,
+  normalCommentHeight = 20,
+  firstCommentHeight = 60,
 } = {}) {
   const pagehideListeners = new Set()
   const warnings = []
@@ -62,28 +78,82 @@ function makeLiveTemplateHarness({
     unsubscribe: 0,
   }
   const rootElement = {}
+  const children = []
   const container = {
-    childElementCount: 0,
-    clientHeight: 0,
-    lastElementChild: null,
-    prepend() {},
-    scrollHeight: 0,
+    children,
+    get childElementCount() {
+      return children.length
+    },
+    clientHeight: containerClientHeight,
+    get lastElementChild() {
+      return children.at(-1) || null
+    },
+    prepend(element) {
+      element.parentElement = container
+      children.unshift(element)
+    },
+    get scrollHeight() {
+      return children.reduce((total, element) => total + element.offsetHeight, 0)
+    },
     scrollTop: 0,
+  }
+  function createElement() {
+    let className = ''
+    const element = {
+      parentElement: null,
+      style: {},
+      textContent: '',
+      get className() {
+        return className
+      },
+      set className(value) {
+        className = value
+      },
+      classList: {
+        add(...names) {
+          const classes = new Set(className.split(/\s+/u).filter(Boolean))
+          for (const name of names) classes.add(name)
+          className = Array.from(classes).join(' ')
+        },
+        contains(name) {
+          return className.split(/\s+/u).includes(name)
+        },
+      },
+      get offsetHeight() {
+        return element.classList.contains('comment--first')
+          ? firstCommentHeight
+          : normalCommentHeight
+      },
+      addEventListener() {},
+      append() {},
+      remove() {
+        if (!element.parentElement) return
+        const index = element.parentElement.children.indexOf(element)
+        if (index >= 0) element.parentElement.children.splice(index, 1)
+        element.parentElement = null
+      },
+    }
+    return element
   }
   const document = {
     body: { removeAttribute() {} },
     documentElement: rootElement,
+    createElement,
+    createTextNode(value) {
+      return { textContent: value }
+    },
     getElementById(id) {
       return id === 'comments' ? container : null
     },
   }
+  let commentsCallback = null
   const window = {
     FirstCommentBigCore: {
       createAnonymousHistory() {
         return {}
       },
-      createDisplayModel() {
-        return null
+      createDisplayModel(comment, history, options) {
+        return createDisplayModel(comment, history, options)
       },
       decodeHtmlEntitiesOnce(value) {
         return value
@@ -96,6 +166,7 @@ function makeLiveTemplateHarness({
       createKickPresentation() { return null },
     },
     FirstCommentBigSettingsClient: {
+      DEFAULT_SETTINGS,
       createSettingsClient(options) {
         calls.createSettingsClient.push(options)
         return {
@@ -115,7 +186,8 @@ function makeLiveTemplateHarness({
         return oneSDKReady ? oneSDKReady() : Promise.resolve()
       },
       async setup() {},
-      subscribe() {
+      subscribe({ callback }) {
+        commentsCallback = callback
         return 'subscriber-id'
       },
       async connect() {
@@ -142,8 +214,13 @@ function makeLiveTemplateHarness({
 
   return {
     calls,
+    container,
     rootElement,
     warnings,
+    emitComments(comments) {
+      if (!commentsCallback) throw new Error('comments subscription is not ready')
+      commentsCallback(comments)
+    },
     emitPagehide() {
       for (const listener of pagehideListeners) listener()
     },
@@ -153,7 +230,7 @@ function makeLiveTemplateHarness({
   }
 }
 
-function makeHarness(queue = []) {
+function makeHarness(queue = [], { onSettingsChanged } = {}) {
   const styleCalls = []
   const events = []
   const fetchCalls = []
@@ -162,6 +239,35 @@ function makeHarness(queue = []) {
   const cleared = []
   const controllers = []
   let fitCalls = 0
+  const documentElements = new Map()
+  const fontLinks = []
+
+  const ownerDocument = {
+    head: {
+      append(element) {
+        fontLinks.push(element)
+        if (element.id) documentElements.set(element.id, element)
+      },
+    },
+    createElement(tagName) {
+      const listeners = new Map()
+      return {
+        tagName: String(tagName).toUpperCase(),
+        addEventListener(type, listener) {
+          const callbacks = listeners.get(type) || []
+          callbacks.push(listener)
+          listeners.set(type, callbacks)
+        },
+        dispatchEvent(event) {
+          for (const listener of listeners.get(event.type) || []) listener.call(this, event)
+          return true
+        },
+      }
+    },
+    getElementById(id) {
+      return documentElements.get(id) || null
+    },
+  }
 
   class FakeAbortController {
     constructor() {
@@ -177,6 +283,7 @@ function makeHarness(queue = []) {
   }
 
   const rootElement = {
+    ownerDocument,
     style: {
       setProperty(name, value) {
         styleCalls.push([name, value])
@@ -217,6 +324,7 @@ function makeHarness(queue = []) {
     warn(...args) {
       warnings.push(args)
     },
+    onSettingsChanged,
   })
 
   return {
@@ -228,6 +336,7 @@ function makeHarness(queue = []) {
     intervals,
     cleared,
     controllers,
+    fontLinks,
     fitCalls: () => fitCalls,
     tick: () => intervals[0].callback(),
   }
@@ -245,6 +354,28 @@ test('既定値と正規化規則をプラグインcoreへ依存せず公開す�
     [null, 'light'],
   ]) {
     assert.equal(clientModule.normalizeSettings({ theme: value }).theme, expected)
+  }
+
+  for (const [value, expected] of [
+    ['standard', 'standard'],
+    ['meiryo', 'meiryo'],
+    ['biz-ud', 'biz-ud'],
+    ['rounded', 'rounded'],
+    ['unknown', 'standard'],
+    [null, 'standard'],
+  ]) {
+    assert.equal(clientModule.normalizeSettings({ fontPreset: value }).fontPreset, expected)
+  }
+
+  assert.equal(
+    clientModule.normalizeSettings({ anonymousFirstCommentBig: true }).anonymousFirstCommentBig,
+    true,
+  )
+  for (const value of [false, 1, 'true', null, undefined]) {
+    assert.equal(
+      clientModule.normalizeSettings({ anonymousFirstCommentBig: value }).anonymousFirstCommentBig,
+      false,
+    )
   }
 
   for (const [value, expected] of [
@@ -267,7 +398,141 @@ test('既定値と正規化規則をプラグインcoreへ依存せず公開す�
   assert.deepEqual(clientModule.normalizeSettings([]), DEFAULT_SETTINGS)
   assert.equal(clientModule.settingsEqual(DEFAULT_SETTINGS, { ...DEFAULT_SETTINGS, ignored: true }), true)
   assert.equal(clientModule.settingsEqual(DEFAULT_SETTINGS, { ...DEFAULT_SETTINGS, theme: 'dark' }), false)
+  assert.equal(clientModule.settingsEqual(DEFAULT_SETTINGS, { ...DEFAULT_SETTINGS, fontPreset: 'meiryo' }), false)
+  assert.equal(clientModule.settingsEqual(DEFAULT_SETTINGS, { ...DEFAULT_SETTINGS, anonymousFirstCommentBig: true }), false)
   assert.equal(clientModule.settingsEqual(null, DEFAULT_SETTINGS), false)
+})
+
+test('fontPreset変更はfont変数とfitを一度だけ更新し同値再取得はno-opにする', async () => {
+  const rounded = { ...DEFAULT_SETTINGS, fontPreset: 'rounded' }
+  const harness = makeHarness([
+    settingsResponse(rounded),
+    settingsResponse(rounded),
+    settingsResponse({ ...rounded, fontPreset: 'meiryo' }),
+  ])
+
+  await harness.client.start()
+  assert.deepEqual(harness.styleCalls, [
+    ['--comment-font-family', FONT_FAMILIES.rounded],
+  ])
+  assert.equal(harness.fitCalls(), 1)
+
+  await harness.tick()
+  assert.equal(harness.styleCalls.length, 1)
+  assert.equal(harness.fitCalls(), 1)
+
+  await harness.tick()
+  assert.deepEqual(harness.styleCalls.at(-1), [
+    '--comment-font-family',
+    FONT_FAMILIES.meiryo,
+  ])
+  assert.equal(harness.fitCalls(), 2)
+})
+
+test('roundedだけがweight 700のGoogle Fonts stylesheetを1個追加する', async () => {
+  for (const fontPreset of ['standard', 'meiryo', 'biz-ud']) {
+    const localHarness = makeHarness([
+      settingsResponse({ ...DEFAULT_SETTINGS, fontPreset }),
+    ])
+    await localHarness.client.start()
+    assert.deepEqual(localHarness.fontLinks, [], fontPreset)
+  }
+
+  const roundedHarness = makeHarness([
+    settingsResponse({ ...DEFAULT_SETTINGS, fontPreset: 'rounded' }),
+  ])
+  await roundedHarness.client.start()
+
+  assert.equal(roundedHarness.fontLinks.length, 1)
+  assert.equal(roundedHarness.fontLinks[0].id, 'first-comment-big-rounded-font')
+  assert.equal(roundedHarness.fontLinks[0].rel, 'stylesheet')
+  assert.equal(roundedHarness.fontLinks[0].href, ROUNDED_FONT_STYLESHEET_URL)
+  assert.deepEqual(roundedHarness.styleCalls, [
+    ['--comment-font-family', FONT_FAMILIES.rounded],
+  ])
+  assert.equal(roundedHarness.fitCalls(), 1)
+})
+
+test('roundedの同値pollとrounded→standard→roundedでstylesheetを重複追加しない', async () => {
+  const rounded = { ...DEFAULT_SETTINGS, fontPreset: 'rounded' }
+  const harness = makeHarness([
+    settingsResponse(rounded),
+    settingsResponse(rounded),
+    settingsResponse(DEFAULT_SETTINGS),
+    settingsResponse(rounded),
+  ])
+
+  await harness.client.start()
+  await harness.tick()
+  await harness.tick()
+  await harness.tick()
+
+  assert.equal(harness.fontLinks.length, 1)
+  assert.equal(harness.fitCalls(), 3)
+})
+
+test('rounded stylesheetのerror後もpollをrejectせず後続設定を適用する', async () => {
+  const harness = makeHarness([
+    settingsResponse({ ...DEFAULT_SETTINGS, fontPreset: 'rounded' }),
+    settingsResponse({ ...DEFAULT_SETTINGS, fontPreset: 'meiryo' }),
+  ])
+
+  await assert.doesNotReject(harness.client.start())
+  assert.equal(harness.fontLinks.length, 1)
+  assert.doesNotThrow(() => harness.fontLinks[0].dispatchEvent({ type: 'error' }))
+  await assert.doesNotReject(harness.tick())
+
+  assert.equal(harness.fetchCalls.length, 2)
+  assert.deepEqual(harness.styleCalls.at(-1), [
+    '--comment-font-family',
+    FONT_FAMILIES.meiryo,
+  ])
+  assert.equal(harness.fitCalls(), 2)
+})
+
+test('匿名設定だけの変更はCSSとfitを更新せず完全設定をcallbackへ渡す', async () => {
+  const received = []
+  const enabled = { ...DEFAULT_SETTINGS, anonymousFirstCommentBig: true }
+  const harness = makeHarness(
+    [settingsResponse(enabled), settingsResponse(enabled)],
+    { onSettingsChanged(settings) { received.push(settings) } },
+  )
+
+  await harness.client.start()
+  assert.deepEqual(harness.styleCalls, [])
+  assert.deepEqual(harness.fontLinks, [])
+  assert.equal(harness.fitCalls(), 0)
+  assert.deepEqual(received, [enabled])
+  assert.notEqual(received[0], enabled)
+
+  await harness.tick()
+  assert.deepEqual(received, [enabled])
+  assert.deepEqual(harness.styleCalls, [])
+  assert.equal(harness.fitCalls(), 0)
+})
+
+test('設定callback例外をpollから漏らさず後続pollを継続する', async () => {
+  let callbackCalls = 0
+  const harness = makeHarness(
+    [
+      settingsResponse({ ...DEFAULT_SETTINGS, anonymousFirstCommentBig: true }),
+      settingsResponse({ ...DEFAULT_SETTINGS, fontPreset: 'biz-ud' }),
+    ],
+    {
+      onSettingsChanged() {
+        callbackCalls += 1
+        throw new Error('callback failure')
+      },
+    },
+  )
+
+  await assert.doesNotReject(harness.client.start())
+  await assert.doesNotReject(harness.tick())
+  assert.equal(callbackCalls, 2)
+  assert.deepEqual(harness.styleCalls, [
+    ['--comment-font-family', FONT_FAMILIES['biz-ud']],
+  ])
+  assert.equal(harness.fitCalls(), 1)
 })
 
 test('既定応答はCSSとfitを再適用しない', async () => {
@@ -532,16 +797,127 @@ test('ライブテンプレートはOneSDKの初期化を待たず設定クラ�
   assert.equal(harness.calls.settingsStart, 1)
   assert.deepEqual(
     Object.keys(harness.calls.createSettingsClient[0]).sort(),
-    ['fitCommentsToViewport', 'rootElement'],
+    ['fitCommentsToViewport', 'onSettingsChanged', 'rootElement'],
   )
   assert.equal(harness.calls.createSettingsClient[0].rootElement, harness.rootElement)
   assert.equal(typeof harness.calls.createSettingsClient[0].fitCommentsToViewport, 'function')
+  assert.equal(typeof harness.calls.createSettingsClient[0].onSettingsChanged, 'function')
   assert.equal(harness.calls.connect, 0)
 
   ready.resolve()
   await flushAsyncWork()
   await flushAsyncWork()
   assert.equal(harness.calls.connect, 1)
+})
+
+test('ライブテンプレートは匿名BIG設定の現在値だけを判定optionsへ渡す', async () => {
+  const receivedOptions = []
+  const harness = makeLiveTemplateHarness({
+    createDisplayModel(comment, history, options) {
+      receivedOptions.push({ ...options })
+      return { text: comment.text, isFirstComment: false, isOwner: false }
+    },
+  })
+
+  harness.run()
+  await flushAsyncWork()
+  await flushAsyncWork()
+  harness.emitComments([{ text: 'OFF' }])
+  harness.calls.createSettingsClient[0].onSettingsChanged({
+    ...DEFAULT_SETTINGS,
+    anonymousFirstCommentBig: true,
+  })
+  harness.emitComments([{ text: 'ON' }])
+
+  assert.deepEqual(receivedOptions, [
+    { anonymousFirstCommentBig: false },
+    { anonymousFirstCommentBig: true },
+  ])
+})
+
+test('BIGが下端を通過しても過去コメントを失わず表示領域を埋められる', async () => {
+  const harness = makeLiveTemplateHarness({
+    containerClientHeight: 100,
+    createDisplayModel(comment) {
+      return {
+        text: comment.text,
+        isFirstComment: comment.isFirstComment,
+        isOwner: false,
+      }
+    },
+  })
+  const normal = (text) => ({ text, isFirstComment: false })
+
+  harness.run()
+  await flushAsyncWork()
+  await flushAsyncWork()
+
+  harness.emitComments(Array.from({ length: 5 }, (_, index) => normal(`normal-${index + 1}`)))
+  assert.equal(harness.container.scrollHeight, 100)
+
+  harness.emitComments([{ text: 'BIG', isFirstComment: true }])
+  const countAfterBig = harness.container.childElementCount
+  harness.emitComments([normal('after-1'), normal('after-2'), normal('after-3')])
+
+  assert.deepEqual({
+    countAfterBig,
+    finalCount: harness.container.childElementCount,
+    finalHeight: harness.container.scrollHeight,
+    order: harness.container.children.map((element) => element.textContent),
+  }, {
+    countAfterBig: 6,
+    finalCount: 9,
+    finalHeight: 220,
+    order: [
+      'after-3',
+      'after-2',
+      'after-1',
+      'BIG',
+      'normal-5',
+      'normal-4',
+      'normal-3',
+      'normal-2',
+      'normal-1',
+    ],
+  })
+})
+
+test('新着順を維持してDOMを最大100件に制限する', async () => {
+  const harness = makeLiveTemplateHarness({
+    containerClientHeight: 2000,
+    createDisplayModel(comment) {
+      return { text: comment.text, isFirstComment: false, isOwner: false }
+    },
+  })
+
+  harness.run()
+  await flushAsyncWork()
+  await flushAsyncWork()
+  harness.emitComments(Array.from({ length: 101 }, (_, index) => ({
+    text: `normal-${index + 1}`,
+  })))
+
+  assert.equal(harness.container.childElementCount, 100)
+  assert.equal(harness.container.children[0].textContent, 'normal-101')
+  assert.equal(harness.container.lastElementChild.textContent, 'normal-2')
+})
+
+test('表示領域より高いコメントが1件だけでも削除しない', async () => {
+  const harness = makeLiveTemplateHarness({
+    containerClientHeight: 100,
+    firstCommentHeight: 120,
+    createDisplayModel(comment) {
+      return { text: comment.text, isFirstComment: true, isOwner: false }
+    },
+  })
+
+  harness.run()
+  await flushAsyncWork()
+  await flushAsyncWork()
+  harness.emitComments([{ text: 'giant BIG' }])
+
+  assert.equal(harness.container.childElementCount, 1)
+  assert.equal(harness.container.scrollHeight, 120)
 })
 
 test('ライブテンプレートは予期しない設定開始のrejectを警告へ収容しOneSDK接続を継続する', async () => {

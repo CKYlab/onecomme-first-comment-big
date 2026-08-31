@@ -1,4 +1,5 @@
 :root {
+  --comment-font-family: "Yu Gothic UI", "Yu Gothic", Meiryo, sans-serif;
   --comment-font-size: 32px;
   --first-comment-font-size: 64px;
   --panel-background: #ffffff;
@@ -57,7 +58,10 @@ body {
   padding: var(--comment-padding-y, 10px) var(--comment-padding-x, 16px);
   border-bottom: 1px solid var(--comment-border-color, #d8d8d8);
   color: var(--comment-text-color, #000000);
-  font-family: "Yu Gothic UI", "Yu Gothic", Meiryo, sans-serif;
+  font-family: var(
+    --comment-font-family,
+    "Yu Gothic UI", "Yu Gothic", Meiryo, sans-serif
+  );
   font-size: var(--comment-font-size, 32px);
   font-weight: 700;
   line-height: 1.35;
