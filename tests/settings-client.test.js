@@ -297,6 +297,8 @@ test('変更された設定に対応するCSS変数だけを更新し各応答�
     ['--panel-background', '#0b0b0b'],
     ['--comment-text-color', '#ffffff'],
     ['--comment-border-color', '#333333'],
+    ['--gift-neutral-background', '#222222'],
+    ['--gift-neutral-text-color', '#ffffff'],
     ['--comment-font-size', '40px'],
     ['--first-comment-font-size', '80px'],
   ])
@@ -321,6 +323,8 @@ test('変更された設定に対応するCSS変数だけを更新し各応答�
     ['set', '--panel-background', '#ffffff'],
     ['set', '--comment-text-color', '#000000'],
     ['set', '--comment-border-color', '#d8d8d8'],
+    ['set', '--gift-neutral-background', '#ffffff'],
+    ['set', '--gift-neutral-text-color', '#000000'],
     ['fit'],
   ])
   assert.equal(harness.fitCalls(), 4)
@@ -417,10 +421,12 @@ test('HTTP・fetch・JSON・応答構造の失敗は既定値へ戻りPromiseを
     await assert.doesNotReject(harness.client.start())
     await assert.doesNotReject(harness.tick())
 
-    assert.deepEqual(harness.styleCalls.slice(-5), [
+    assert.deepEqual(harness.styleCalls.slice(-7), [
       ['--panel-background', '#ffffff'],
       ['--comment-text-color', '#000000'],
       ['--comment-border-color', '#d8d8d8'],
+      ['--gift-neutral-background', '#ffffff'],
+      ['--gift-neutral-text-color', '#000000'],
       ['--comment-font-size', '32px'],
       ['--first-comment-font-size', '64px'],
     ])

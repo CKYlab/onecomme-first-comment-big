@@ -17,11 +17,15 @@
       panelBackground: '#ffffff',
       commentTextColor: '#000000',
       commentBorderColor: '#d8d8d8',
+      giftNeutralBackground: '#ffffff',
+      giftNeutralTextColor: '#000000',
     }),
     dark: Object.freeze({
       panelBackground: '#0b0b0b',
       commentTextColor: '#ffffff',
       commentBorderColor: '#333333',
+      giftNeutralBackground: '#222222',
+      giftNeutralTextColor: '#ffffff',
     }),
   })
 
@@ -92,6 +96,8 @@
         rootElement.style.setProperty('--panel-background', colors.panelBackground)
         rootElement.style.setProperty('--comment-text-color', colors.commentTextColor)
         rootElement.style.setProperty('--comment-border-color', colors.commentBorderColor)
+        rootElement.style.setProperty('--gift-neutral-background', colors.giftNeutralBackground)
+        rootElement.style.setProperty('--gift-neutral-text-color', colors.giftNeutralTextColor)
         changed = true
       }
       if (next.commentFontSize !== lastApplied.commentFontSize) {

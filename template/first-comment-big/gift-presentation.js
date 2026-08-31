@@ -76,11 +76,11 @@
     const backgroundColor =
       usePaidColors && colors && isNonBlankString(colors.bodyBackgroundColor)
         ? colors.bodyBackgroundColor
-        : '#ffffff'
+        : 'var(--gift-neutral-background, #ffffff)'
     const textColor =
       usePaidColors && colors && isNonBlankString(colors.bodyTextColor)
         ? colors.bodyTextColor
-        : '#000000'
+        : 'var(--gift-neutral-text-color, #000000)'
 
     return {
       text,

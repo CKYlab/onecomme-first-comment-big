@@ -5,6 +5,9 @@ const assert = require('node:assert/strict')
 
 const giftPresentation = require('../template/first-comment-big/gift-presentation.js')
 
+const NEUTRAL_BACKGROUND = 'var(--gift-neutral-background, #ffffff)'
+const NEUTRAL_TEXT_COLOR = 'var(--gift-neutral-text-color, #000000)'
+
 function makeGift(overrides = {}) {
   return {
     service: 'twicas',
@@ -25,8 +28,8 @@ test('TwitCasting giftはitem.nameを優先してspeechTextの重複を表示し
   assert.deepEqual(giftPresentation.createGiftPresentation(makeGift()), {
     text: 'Tea x 10 (+🍡20)',
     imageUrl: 'https://s01.example.test/tea.png',
-    backgroundColor: '#ffffff',
-    textColor: '#000000',
+    backgroundColor: NEUTRAL_BACKGROUND,
+    textColor: NEUTRAL_TEXT_COLOR,
   })
 })
 
@@ -101,12 +104,12 @@ test('item.nameがない場合だけspeechTextへフォールバックする', (
   assert.deepEqual(giftPresentation.createGiftPresentation(comment), {
     text: '安全な読み上げテキスト',
     imageUrl: 'https://s01.example.test/tea.png',
-    backgroundColor: '#ffffff',
-    textColor: '#000000',
+    backgroundColor: NEUTRAL_BACKGROUND,
+    textColor: NEUTRAL_TEXT_COLOR,
   })
 })
 
-test('無料giftはcolorsやmeta.freeに関係なく白背景・黒文字になる', () => {
+test('無料giftはcolorsやmeta.freeに関係なくneutral CSS変数を参照する', () => {
   const comment = makeGift({
     isFreeGift: true,
     colors: {
@@ -117,8 +120,8 @@ test('無料giftはcolorsやmeta.freeに関係なく白背景・黒文字にな�
   comment.meta = { free: false }
 
   const presentation = giftPresentation.createGiftPresentation(comment)
-  assert.equal(presentation.backgroundColor, '#ffffff')
-  assert.equal(presentation.textColor, '#000000')
+  assert.equal(presentation.backgroundColor, NEUTRAL_BACKGROUND)
+  assert.equal(presentation.textColor, NEUTRAL_TEXT_COLOR)
 })
 
 test('有料giftはpriceで算出せずOneSDKのbody背景色・文字色をそのまま使用する', () => {
@@ -137,13 +140,13 @@ test('有料giftはpriceで算出せずOneSDKのbody背景色・文字色をそ�
   assert.equal(presentation.textColor, 'rgb(210, 220, 230)')
 })
 
-test('有料giftでもcolorsが欠落した場合は白背景・黒文字へfallbackする', () => {
+test('有料giftでもcolorsが欠落した場合はneutral CSS変数へfallbackする', () => {
   const presentation = giftPresentation.createGiftPresentation(
     makeGift({ isFreeGift: false, colors: null }),
   )
 
-  assert.equal(presentation.backgroundColor, '#ffffff')
-  assert.equal(presentation.textColor, '#000000')
+  assert.equal(presentation.backgroundColor, NEUTRAL_BACKGROUND)
+  assert.equal(presentation.textColor, NEUTRAL_TEXT_COLOR)
 })
 
 test('giftのdata.commentに含まれるHTMLは表示テキストに使用しない', () => {

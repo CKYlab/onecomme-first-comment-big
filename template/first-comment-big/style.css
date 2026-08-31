@@ -4,6 +4,8 @@
   --panel-background: #ffffff;
   --comment-text-color: var(--comment-color, #000000);
   --comment-border-color: #d8d8d8;
+  --gift-neutral-background: #ffffff;
+  --gift-neutral-text-color: #000000;
   --comment-padding-x: 16px;
   --comment-padding-y: 10px;
   --gift-image-size: 1.65em;
