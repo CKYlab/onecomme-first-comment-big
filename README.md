@@ -129,5 +129,3 @@ README.txt
 - 通常コメント / 初コメBIG文字サイズのリアルタイム変更
 - TwitCasting匿名初コメBIGのON / OFFと履歴継続
 - 設定プラグインON / OFF時のフォールバックと保存設定復帰
-
-正式な配布ZIP、tag、GitHub Releaseは、追加の表示確認と整理が終わってから作成する予定です。
