@@ -28,8 +28,8 @@ function persistIfChanged(plugin, next) {
 const plugin = {
   name: '初コメBIG 設定',
   uid: 'com.ckylab.first-comment-big-settings',
-  version: '1.0.0',
-  author: 'CKY Lab',
+  version: '1.1.0',
+  author: 'マボロシ工房 / CKY Lab',
   url: 'http://localhost:11180/plugins/com.ckylab.first-comment-big-settings/index.html',
   permissions: [],
   defaultState: { ...DEFAULT_SETTINGS },
