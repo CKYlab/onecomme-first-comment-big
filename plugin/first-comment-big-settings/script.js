@@ -28,6 +28,7 @@
     'comment-font-size',
     'first-comment-font-size',
     'anonymous-first-comment-big',
+    'retro-window-frame',
     'save',
     'status',
   ]
@@ -59,6 +60,7 @@
     const commentFontSize = elements['comment-font-size']
     const firstCommentFontSize = elements['first-comment-font-size']
     const anonymousFirstCommentBig = elements['anonymous-first-comment-big']
+    const retroWindowFrame = elements['retro-window-frame']
     const saveButton = elements.save
     const status = elements.status
     let pendingRequestCount = 0
@@ -81,6 +83,7 @@
       commentFontSize.value = String(normalized.commentFontSize)
       firstCommentFontSize.value = String(normalized.firstCommentFontSize)
       anonymousFirstCommentBig.checked = normalized.anonymousFirstCommentBig
+      retroWindowFrame.checked = normalized.retroWindowFrame
     }
 
     async function readResponseSettings(response) {
@@ -130,6 +133,7 @@
           commentFontSize: commentFontSize.valueAsNumber,
           firstCommentFontSize: firstCommentFontSize.valueAsNumber,
           anonymousFirstCommentBig: anonymousFirstCommentBig.checked,
+          retroWindowFrame: retroWindowFrame.checked,
         })
         const response = await fetchImpl(endpoint, {
           method: 'PUT',

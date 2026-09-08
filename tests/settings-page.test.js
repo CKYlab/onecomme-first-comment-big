@@ -34,6 +34,7 @@ function createFakeDocument() {
     ['comment-font-size', createElement({ value: '32', valueAsNumber: 32 })],
     ['first-comment-font-size', createElement({ value: '64', valueAsNumber: 64 })],
     ['anonymous-first-comment-big', createElement({ checked: false })],
+    ['retro-window-frame', createElement({ checked: false })],
     ['save', createElement()],
     ['status', createElement()],
   ])
@@ -63,7 +64,32 @@ function deferred() {
   return { promise, resolve }
 }
 
-test('loadはGET応答を正規化して5入力へ反映する', async () => {
+test('レトロテーマと枠のGET反映・PUT保存・失敗時の入力保持', async () => {
+  const document = createFakeDocument()
+  const next = { theme: 'amber', fontPreset: 'meiryo', commentFontSize: 40, firstCommentFontSize: 80, anonymousFirstCommentBig: true, retroWindowFrame: true }
+  let fail = false
+  const controller = createSettingsPageController({
+    document, settingsCore,
+    fetchImpl: async (url, options) => {
+      if (options.method === 'PUT') assert.deepEqual(JSON.parse(options.body), next)
+      return jsonResponse({ code: fail ? 400 : 200, response: next })
+    },
+  })
+  await controller.load()
+  assert.equal(document.elements.get('theme').value, 'amber')
+  assert.equal(document.elements.get('retro-window-frame').checked, true)
+  document.elements.get('comment-font-size').valueAsNumber = 40
+  document.elements.get('first-comment-font-size').valueAsNumber = 80
+  await controller.save()
+  assert.equal(document.elements.get('status').textContent, '保存しました。')
+  fail = true
+  await controller.save()
+  assert.equal(document.elements.get('status').textContent, '設定を保存できませんでした。')
+  assert.equal(document.elements.get('retro-window-frame').checked, true)
+  assert.equal(document.elements.get('theme').value, 'amber')
+})
+
+test('loadはGET応答を正規化して6入力へ反映する', async () => {
   const document = createFakeDocument()
   const calls = []
   const controller = createSettingsPageController({
@@ -80,6 +106,7 @@ test('loadはGET応答を正規化して5入力へ反映する', async () => {
           commentFontSize: 40,
           firstCommentFontSize: 80,
           anonymousFirstCommentBig: true,
+          retroWindowFrame: false,
           ignored: true,
         },
       })
@@ -233,6 +260,7 @@ test('新しいsave完了後に初期GET成功が遅れても保存結果を上�
       commentFontSize: 41,
       firstCommentFontSize: 81,
       anonymousFirstCommentBig: true,
+      retroWindowFrame: false,
     },
   }))
   await saving
@@ -244,6 +272,7 @@ test('新しいsave完了後に初期GET成功が遅れても保存結果を上�
       commentFontSize: 20,
       firstCommentFontSize: 30,
       anonymousFirstCommentBig: false,
+      retroWindowFrame: false,
     },
   }))
   await loading
@@ -287,6 +316,7 @@ test('新しいsave中に初期GET失敗が先に完了しても入力と状態�
     commentFontSize: document.elements.get('comment-font-size').value,
     firstCommentFontSize: document.elements.get('first-comment-font-size').value,
     anonymousFirstCommentBig: document.elements.get('anonymous-first-comment-big').checked,
+    retroWindowFrame: document.elements.get('retro-window-frame').checked,
     status: document.elements.get('status').textContent,
     saveDisabled: document.elements.get('save').disabled,
   }
@@ -298,6 +328,7 @@ test('新しいsave中に初期GET失敗が先に完了しても入力と状態�
       commentFontSize: 40,
       firstCommentFontSize: 80,
       anonymousFirstCommentBig: true,
+      retroWindowFrame: false,
     },
   }))
   await saving
@@ -308,6 +339,7 @@ test('新しいsave中に初期GET失敗が先に完了しても入力と状態�
     commentFontSize: '40',
     firstCommentFontSize: '80',
     anonymousFirstCommentBig: true,
+    retroWindowFrame: false,
     status: '',
     saveDisabled: true,
   })
@@ -339,6 +371,7 @@ test('saveはvalueAsNumberから完全設定をPUTして応答を再反映する
           commentFontSize: 40,
           firstCommentFontSize: 80,
           anonymousFirstCommentBig: true,
+          retroWindowFrame: false,
         },
       })
     },
@@ -358,6 +391,7 @@ test('saveはvalueAsNumberから完全設定をPUTして応答を再反映する
     commentFontSize: 40,
     firstCommentFontSize: 80,
     anonymousFirstCommentBig: true,
+    retroWindowFrame: false,
   })
   assert.equal(document.elements.get('theme').value, 'dark')
   assert.equal(document.elements.get('font-preset').value, 'rounded')
@@ -469,6 +503,7 @@ test('ブラウザ起動時に必須DOMを確認してsubmit登録と初期GET�
           commentFontSize: 40,
           firstCommentFontSize: 80,
           anonymousFirstCommentBig: true,
+          retroWindowFrame: false,
         },
       })
     },

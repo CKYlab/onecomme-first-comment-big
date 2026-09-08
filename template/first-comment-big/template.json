@@ -2,7 +2,7 @@
   "name": "初コメBIG",
   "author": "マボロシ工房 / CKY Lab",
   "link": "https://onecomme.com/docs/feature/templates/",
-  "description": "コメント本文を縦表示し、初回コメントだけを大きく表示。ライト／ダーク、フォント、文字サイズ、ツイキャス匿名初コメ設定に対応",
+  "description": "初回コメントだけ大きく縦表示。ライト／ダークとレトロ配色、一覧全体のレトロ枠、フォント、文字サイズ、ツイキャス匿名初コメ設定に対応",
   "width": 1920,
   "height": 1080
 }

@@ -10,12 +10,13 @@ function isCanonicalSettings(value, normalized) {
   return Boolean(value) &&
     typeof value === 'object' &&
     !Array.isArray(value) &&
-    Object.keys(value).length === 5 &&
+    Object.keys(value).length === 6 &&
     Object.hasOwn(value, 'theme') &&
     Object.hasOwn(value, 'fontPreset') &&
     Object.hasOwn(value, 'commentFontSize') &&
     Object.hasOwn(value, 'firstCommentFontSize') &&
     Object.hasOwn(value, 'anonymousFirstCommentBig') &&
+    Object.hasOwn(value, 'retroWindowFrame') &&
     settingsEqual(value, normalized)
 }
 
@@ -28,7 +29,7 @@ function persistIfChanged(plugin, next) {
 const plugin = {
   name: '初コメBIG 設定',
   uid: 'com.ckylab.first-comment-big-settings',
-  version: '1.1.0',
+  version: '1.2.0',
   author: 'マボロシ工房 / CKY Lab',
   url: 'http://localhost:11180/plugins/com.ckylab.first-comment-big-settings/index.html',
   permissions: [],

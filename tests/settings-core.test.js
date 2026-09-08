@@ -11,6 +11,7 @@ test('既定設定を公開し入力を変更せず完全設定を返す', () =>
     commentFontSize: 32,
     firstCommentFontSize: 64,
     anonymousFirstCommentBig: true,
+    retroWindowFrame: false,
     unknown: 'drop-me',
   }
   const before = structuredClone(input)
@@ -20,6 +21,7 @@ test('既定設定を公開し入力を変更せず完全設定を返す', () =>
     commentFontSize: 32,
     firstCommentFontSize: 64,
     anonymousFirstCommentBig: true,
+    retroWindowFrame: false,
   })
   assert.deepEqual(input, before)
   assert.deepEqual(core.DEFAULT_SETTINGS, {
@@ -28,16 +30,18 @@ test('既定設定を公開し入力を変更せず完全設定を返す', () =>
     commentFontSize: 32,
     firstCommentFontSize: 64,
     anonymousFirstCommentBig: false,
+    retroWindowFrame: false,
   })
   assert.equal(Object.isFrozen(core.DEFAULT_SETTINGS), true)
 })
 
-test('fontPresetは許可4値だけを受理し不正値をstandardへ戻す', () => {
+test('fontPresetは許可5値だけを受理し不正値をstandardへ戻す', () => {
   for (const [value, expected] of [
     ['standard', 'standard'],
     ['meiryo', 'meiryo'],
     ['biz-ud', 'biz-ud'],
     ['rounded', 'rounded'],
+    ['mincho', 'mincho'],
     ['unknown', 'standard'],
     [null, 'standard'],
   ]) {
@@ -56,7 +60,7 @@ test('anonymousFirstCommentBigはboolean trueだけを受理する', () => {
   }
 })
 
-test('themeはlightとdarkだけを受理する', () => {
+test('既存lightとdarkを維持し不正themeをlightへ戻す', () => {
   for (const [value, expected] of [
     ['light', 'light'],
     ['dark', 'dark'],
@@ -88,7 +92,7 @@ test('初コメ文字サイズは24から128の有限整数だけを受理する
   }
 })
 
-test('旧3項目設定を補完し同値性は既知5項目で判定する', () => {
+test('旧3項目設定を補完し同値性は既知6項目で判定する', () => {
   const normalized = core.normalizeSettings({
     theme: 'dark',
     commentFontSize: 100,
@@ -100,10 +104,11 @@ test('旧3項目設定を補完し同値性は既知5項目で判定する', () 
     commentFontSize: 32,
     firstCommentFontSize: 24,
     anonymousFirstCommentBig: false,
+    retroWindowFrame: false,
   })
   assert.equal(core.settingsEqual(normalized, { ...normalized, ignored: true }), true)
   assert.equal(core.settingsEqual(normalized, { ...normalized, theme: 'light' }), false)
   assert.equal(core.settingsEqual(normalized, { ...normalized, fontPreset: 'meiryo' }), false)
-  assert.equal(core.settingsEqual(normalized, { ...normalized, anonymousFirstCommentBig: true }), false)
+  assert.equal(core.settingsEqual(normalized, { ...normalized, anonymousFirstCommentBig: true, retroWindowFrame: false }), false)
   assert.equal(core.settingsEqual(null, normalized), false)
 })
