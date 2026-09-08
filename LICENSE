@@ -1,21 +1,45 @@
-MIT License
+マボロシ工房 ソフトウェア利用規約
 
-Copyright (c) 2026 CKYlab
+Copyright (c) 2026 マボロシ工房 / CKY Lab
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+1. 適用範囲
+本規約は、マボロシ工房 / CKY Lab（以下「提供者」）が本規約を付して提供し、
+利用を許諾する権利を有する「初コメBIG」のテンプレート、設定プラグイン、
+ソースコード、画像および付属文書（以下「本ツール」）に適用します。
+ソースコードの公開は、以下に定める範囲を超えた利用許諾を意味しません。
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+2. 許可する利用
+個人・法人を問わず、次の利用を許可します。
+・配信、動画制作、収益化を含む用途で本ツールを使用すること。
+・自分または自社で使用するために本ツールを改変すること。
+・自用のインストールやバックアップに必要な複製を行うこと。
+配信・動画等でのクレジット表記は任意です。
+本ツールを使用して制作した配信・動画等の公開・収益化は、次条の再配布禁止に
+含まれません。
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+3. 禁止事項
+提供者の別途の許諾がない限り、有償・無償を問わず次の行為を禁止します。
+・本ツールそのものを第三者へ再配布すること。
+・本ツールの改変版を第三者へ配布すること。
+・本ツールの改変版を販売すること。
+・本ツールについて自作であると発言するなど、原作者を偽ること。
+本ツールまたは改変版をダウンロード可能な状態で公開する行為も、配布に含みます。
+
+4. 第三者の権利および法令等との関係
+第三者のコード、フォント、サービスその他の素材には、各権利者が定める条件が
+適用されます。本規約は、それらの権利や利用条件を変更しません。
+本規約は、法令上認められる権利、およびGitHubの利用規約上認められる閲覧・fork等の
+権利を妨げません。
+
+5. 過去の提供版との関係
+本規約は、本規約を付して今後提供する版に適用します。
+過去に別の利用許諾条件で公開・提供したコード等について、その条件に基づき既に
+与えられた許諾を遡って撤回・制限するものではありません。該当するコード等の
+既存の許諾は、その条件に従って取り扱われます。
+
+6. 保証および責任
+本ツールは現状有姿で提供します。法令で許される範囲において、提供者は、
+特定目的への適合性、正確性、継続動作、第三者サービスとの互換性等を保証せず、
+利用または利用不能により生じた損害について責任を負いません。
+本条は、適用法令により免除または制限することのできない責任を免除・制限する
+ものではありません。
