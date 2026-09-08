@@ -12,8 +12,10 @@
     commentFontSize: 32,
     firstCommentFontSize: 64,
     anonymousFirstCommentBig: false,
+    retroWindowFrame: false,
   })
-  const FONT_PRESETS = Object.freeze(['standard', 'meiryo', 'biz-ud', 'rounded'])
+  const FONT_PRESETS = Object.freeze(['standard', 'meiryo', 'biz-ud', 'rounded', 'mincho'])
+  const THEMES = Object.freeze(['light', 'dark', 'classic-gray', 'blue-gray', 'monochrome', 'amber', 'green-crt'])
 
   function validInteger(value, min, max) {
     return typeof value === 'number' &&
@@ -28,7 +30,7 @@
       ? input
       : {}
     return {
-      theme: source.theme === 'dark' ? 'dark' : 'light',
+      theme: THEMES.includes(source.theme) ? source.theme : 'light',
       fontPreset: FONT_PRESETS.includes(source.fontPreset)
         ? source.fontPreset
         : 'standard',
@@ -39,6 +41,7 @@
         ? source.firstCommentFontSize
         : 64,
       anonymousFirstCommentBig: source.anonymousFirstCommentBig === true,
+      retroWindowFrame: source.retroWindowFrame === true,
     }
   }
 
@@ -48,7 +51,8 @@
       a.fontPreset === b.fontPreset &&
       a.commentFontSize === b.commentFontSize &&
       a.firstCommentFontSize === b.firstCommentFontSize &&
-      a.anonymousFirstCommentBig === b.anonymousFirstCommentBig
+      a.anonymousFirstCommentBig === b.anonymousFirstCommentBig &&
+      a.retroWindowFrame === b.retroWindowFrame
   }
 
   return Object.freeze({ DEFAULT_SETTINGS, normalizeSettings, settingsEqual })

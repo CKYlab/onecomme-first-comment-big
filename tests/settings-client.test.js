@@ -18,6 +18,7 @@ const DEFAULT_SETTINGS = {
   commentFontSize: 32,
   firstCommentFontSize: 64,
   anonymousFirstCommentBig: false,
+  retroWindowFrame: false,
 }
 
 const FONT_FAMILIES = {
@@ -25,6 +26,7 @@ const FONT_FAMILIES = {
   meiryo: 'Meiryo, "Yu Gothic UI", "Yu Gothic", sans-serif',
   'biz-ud': '"BIZ UDPGothic", "Yu Gothic UI", Meiryo, sans-serif',
   rounded: '"M PLUS Rounded 1c", "BIZ UDPGothic", "Yu Gothic UI", Meiryo, sans-serif',
+  mincho: '"Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Hiragino Mincho Pro", serif',
 }
 
 const ROUNDED_FONT_STYLESHEET_URL =
@@ -368,7 +370,7 @@ test('既定値と正規化規則をプラグインcoreへ依存せず公開す�
   }
 
   assert.equal(
-    clientModule.normalizeSettings({ anonymousFirstCommentBig: true }).anonymousFirstCommentBig,
+    clientModule.normalizeSettings({ anonymousFirstCommentBig: true, retroWindowFrame: false }).anonymousFirstCommentBig,
     true,
   )
   for (const value of [false, 1, 'true', null, undefined]) {
@@ -399,7 +401,7 @@ test('既定値と正規化規則をプラグインcoreへ依存せず公開す�
   assert.equal(clientModule.settingsEqual(DEFAULT_SETTINGS, { ...DEFAULT_SETTINGS, ignored: true }), true)
   assert.equal(clientModule.settingsEqual(DEFAULT_SETTINGS, { ...DEFAULT_SETTINGS, theme: 'dark' }), false)
   assert.equal(clientModule.settingsEqual(DEFAULT_SETTINGS, { ...DEFAULT_SETTINGS, fontPreset: 'meiryo' }), false)
-  assert.equal(clientModule.settingsEqual(DEFAULT_SETTINGS, { ...DEFAULT_SETTINGS, anonymousFirstCommentBig: true }), false)
+  assert.equal(clientModule.settingsEqual(DEFAULT_SETTINGS, { ...DEFAULT_SETTINGS, anonymousFirstCommentBig: true, retroWindowFrame: false }), false)
   assert.equal(clientModule.settingsEqual(null, DEFAULT_SETTINGS), false)
 })
 
@@ -429,8 +431,27 @@ test('fontPreset変更はfont変数とfitを一度だけ更新し同値再取得
   assert.equal(harness.fitCalls(), 2)
 })
 
+test('minchoの適用と既存各フォントへの復帰はfont変数だけ更新し同値では再適用しない', async () => {
+  for (const fontPreset of ['standard', 'meiryo', 'biz-ud', 'rounded']) {
+    const mincho = { ...DEFAULT_SETTINGS, fontPreset: 'mincho', anonymousFirstCommentBig: true }
+    const harness = makeHarness([settingsResponse(mincho), settingsResponse(mincho), settingsResponse({ ...mincho, fontPreset })])
+    await harness.client.start()
+    assert.deepEqual(harness.styleCalls, [['--comment-font-family', FONT_FAMILIES.mincho]])
+    assert.equal(harness.fitCalls(), 1)
+    assert.equal(harness.fontLinks.length, 0)
+    await harness.tick()
+    assert.equal(harness.styleCalls.length, 1)
+    assert.equal(harness.fitCalls(), 1)
+    await harness.tick()
+    assert.deepEqual(harness.styleCalls, [['--comment-font-family', FONT_FAMILIES.mincho], ['--comment-font-family', FONT_FAMILIES[fontPreset]]])
+    assert.equal(harness.fitCalls(), 2)
+    assert.equal(harness.fontLinks.length, fontPreset === 'rounded' ? 1 : 0)
+    harness.client.stop()
+  }
+})
+
 test('roundedだけがweight 700のGoogle Fonts stylesheetを1個追加する', async () => {
-  for (const fontPreset of ['standard', 'meiryo', 'biz-ud']) {
+  for (const fontPreset of ['standard', 'meiryo', 'biz-ud', 'mincho']) {
     const localHarness = makeHarness([
       settingsResponse({ ...DEFAULT_SETTINGS, fontPreset }),
     ])
@@ -492,7 +513,7 @@ test('rounded stylesheetのerror後もpollをrejectせず後続設定を適用�
 
 test('匿名設定だけの変更はCSSとfitを更新せず完全設定をcallbackへ渡す', async () => {
   const received = []
-  const enabled = { ...DEFAULT_SETTINGS, anonymousFirstCommentBig: true }
+  const enabled = { ...DEFAULT_SETTINGS, anonymousFirstCommentBig: true, retroWindowFrame: false }
   const harness = makeHarness(
     [settingsResponse(enabled), settingsResponse(enabled)],
     { onSettingsChanged(settings) { received.push(settings) } },
@@ -515,7 +536,7 @@ test('設定callback例外をpollから漏らさず後続pollを継続する', a
   let callbackCalls = 0
   const harness = makeHarness(
     [
-      settingsResponse({ ...DEFAULT_SETTINGS, anonymousFirstCommentBig: true }),
+      settingsResponse({ ...DEFAULT_SETTINGS, anonymousFirstCommentBig: true, retroWindowFrame: false }),
       settingsResponse({ ...DEFAULT_SETTINGS, fontPreset: 'biz-ud' }),
     ],
     {
@@ -564,6 +585,8 @@ test('変更された設定に対応するCSS変数だけを更新し各応答�
     ['--comment-border-color', '#333333'],
     ['--gift-neutral-background', '#222222'],
     ['--gift-neutral-text-color', '#ffffff'],
+    ['--retro-title-background', '#333333'],
+    ['--retro-title-text-color', '#ffffff'],
     ['--comment-font-size', '40px'],
     ['--first-comment-font-size', '80px'],
   ])
@@ -590,6 +613,8 @@ test('変更された設定に対応するCSS変数だけを更新し各応答�
     ['set', '--comment-border-color', '#d8d8d8'],
     ['set', '--gift-neutral-background', '#ffffff'],
     ['set', '--gift-neutral-text-color', '#000000'],
+    ['set', '--retro-title-background', '#000080'],
+    ['set', '--retro-title-text-color', '#ffffff'],
     ['fit'],
   ])
   assert.equal(harness.fitCalls(), 4)
@@ -686,12 +711,14 @@ test('HTTP・fetch・JSON・応答構造の失敗は既定値へ戻りPromiseを
     await assert.doesNotReject(harness.client.start())
     await assert.doesNotReject(harness.tick())
 
-    assert.deepEqual(harness.styleCalls.slice(-7), [
+    assert.deepEqual(harness.styleCalls.slice(-9), [
       ['--panel-background', '#ffffff'],
       ['--comment-text-color', '#000000'],
       ['--comment-border-color', '#d8d8d8'],
       ['--gift-neutral-background', '#ffffff'],
       ['--gift-neutral-text-color', '#000000'],
+      ['--retro-title-background', '#000080'],
+      ['--retro-title-text-color', '#ffffff'],
       ['--comment-font-size', '32px'],
       ['--first-comment-font-size', '64px'],
     ])
@@ -826,6 +853,7 @@ test('ライブテンプレートは匿名BIG設定の現在値だけを判定op
   harness.calls.createSettingsClient[0].onSettingsChanged({
     ...DEFAULT_SETTINGS,
     anonymousFirstCommentBig: true,
+    retroWindowFrame: false,
   })
   harness.emitComments([{ text: 'ON' }])
 

@@ -4,7 +4,7 @@
 
 「初コメBIG」に、わんコメ公式プラグイン機構を使った設定機能を追加する。設定はプラグインの defaultState / store に永続保存し、テンプレートはプラグイン専用REST APIを500ms間隔でGETする。ローカルAPIが通常応答する条件では、保存後の次回ポーリングから最大約0.5秒でOBS表示へ反映する。OBSブラウザソースの再読み込みは不要とする。
 
-初期設計の3項目へ、実機検証後の独立タスクでフォントプリセットとTwitCasting匿名初コメBIG設定を追加し、現在は5項目を扱う。本書は実装済みの契約と実機確認結果を記録する。名前表示、アイコン表示、初コメBIG全体のON/OFF、自由色指定などは扱わない。
+初期設計の3項目へ、実機検証後の独立タスクでフォントプリセットとTwitCasting匿名初コメBIG設定を追加し、v1.2.0でレトロ枠を加えて現在は6項目を扱う。本書は実装済みの契約と実機確認結果を記録する。名前表示、アイコン表示、初コメBIG全体のON/OFF、自由色指定などは扱わない。
 
 ## 2. 採用方式
 
@@ -40,16 +40,18 @@ localStorage共有、設定ファイルの直接読み書き、WebSocketによ�
       "fontPreset": "standard",
       "commentFontSize": 32,
       "firstCommentFontSize": 64,
-      "anonymousFirstCommentBig": false
+      "anonymousFirstCommentBig": false,
+      "retroWindowFrame": false
     }
 
 | キー | 型 | 既定値 | 受理する値 |
 | --- | --- | ---: | --- |
-| theme | string | light | light または dark |
-| fontPreset | string | standard | standard、meiryo、biz-ud、rounded |
+| theme | string | light | light、dark、classic-gray、blue-gray、monochrome、amber、green-crt |
+| fontPreset | string | standard | standard、meiryo、biz-ud、rounded、mincho |
 | commentFontSize | number | 32 | 16以上64以下の有限な整数 |
 | firstCommentFontSize | number | 64 | 24以上128以下の有限な整数 |
 | anonymousFirstCommentBig | boolean | false | booleanのtrueだけをONとして受理 |
+| retroWindowFrame | boolean | false | booleanのtrueだけをONとして受理 |
 
 正規化は項目ごとに行う。不正な1項目が、ほかの妥当な項目を無効にしてはならない。欠落値と不正値はその項目の既定値へ戻し、未知キーは保存結果と応答から除外する。
 
@@ -84,7 +86,7 @@ localStorage共有、設定ファイルの直接読み書き、WebSocketによ�
 | --- | --- |
 | name | 初コメBIG 設定 |
 | uid | com.ckylab.first-comment-big-settings |
-| version | 1.0.0 |
+| version | 1.2.0 |
 | author | CKY Lab |
 | url | http://localhost:11180/plugins/com.ckylab.first-comment-big-settings/index.html |
 | permissions | `[]`（公式型定義および実機で受理確認済み） |
@@ -97,7 +99,7 @@ localStorage共有、設定ファイルの直接読み書き、WebSocketによ�
 
 ### 5.3 状態初期化
 
-起動時に store.store を正規化する。未保存、旧3項目形式、不正値、余分なキーがある場合は完全な5項目の正規化済みオブジェクトへ置き換える。保存前後の比較は5項目の値で行い、同一なら不要なストア書き込みをしない。正規化関数は入力を変更せず、新しいオブジェクトを返す。
+起動時に store.store を正規化する。未保存、旧3項目・旧5項目形式、不正値、余分なキーがある場合は完全な6項目の正規化済みオブジェクトへ置き換える。保存前後の比較は6項目の値で行い、同一なら不要なストア書き込みをしない。正規化関数は入力を変更せず、新しいオブジェクトを返す。
 
 ### 5.4 REST API
 
@@ -127,6 +129,8 @@ PUT:
     テーマ
     [ ライト ▼ ]
 
+    [ ] レトロウインドウ枠
+
     フォント
     [ 標準（游ゴシック） ▼ ]
 
@@ -140,8 +144,9 @@ PUT:
 
     [ 保存 ]
 
-- テーマはselectとし、値light/dark、表示「ライト」/「ダーク」とする。
-- フォントはselectとし、standard／meiryo／biz-ud／roundedを保存する。表示は「標準（游ゴシック）」「メイリオ」「太ゴシック（BIZ UDPゴシック）」「丸ゴシック（M PLUS Rounded 1c）」とする。
+- テーマはselectとし、4章の7値を「ライト」「ダーク」「クラシックグレー」「ブルーグレー」「モノクロ」「アンバー」「グリーンCRT」として表示する。
+- レトロウインドウ枠はcheckboxのchecked booleanとし、既定OFFとする。
+- フォントはselectとし、standard／meiryo／biz-ud／rounded／minchoを保存する。表示は「標準（游ゴシック）」「メイリオ」「太ゴシック（BIZ UDPゴシック）」「丸ゴシック（M PLUS Rounded 1c）」「明朝体」とする。
 - 通常文字サイズは input type="number" min="16" max="64" step="1" とする。
 - 初コメ文字サイズは input type="number" min="24" max="128" step="1" とする。
 - TwitCasting匿名初コメBIGはcheckboxのchecked booleanとして扱い、既定はOFFとする。
@@ -174,7 +179,7 @@ template/first-comment-big/settings-client.js は、ブラウザとNodeテスト
 
 ### 7.3 フォールバック
 
-次の場合、取得結果全体を light / standard / 32 / 64 / 匿名BIG OFFとして処理する。
+次の場合、取得結果全体を light / standard / 32 / 64 / 匿名BIG OFF / 枠OFFとして処理する。
 
 - プラグインが未導入、無効、起動前
 - fetch失敗、HTTPエラー
@@ -187,7 +192,7 @@ template/first-comment-big/settings-client.js は、ブラウザとNodeテスト
 
 ### 7.4 CSS変数の差分適用
 
-初期適用値は既存CSSと同じ light / standard / 32 / 64 / 匿名BIG OFFとする。前回適用値を保持し、変わった視覚項目に対応する変数だけをdocument.documentElement.style.setPropertyで更新する。
+初期適用値は既存CSSと同じ light / standard / 32 / 64 / 匿名BIG OFF / 枠OFFとする。前回適用値を保持し、変わった視覚項目に対応する変数だけをdocument.documentElement.style.setPropertyで更新する。
 
 | 設定 | 更新するCSS変数 |
 | --- | --- |
@@ -197,9 +202,9 @@ template/first-comment-big/settings-client.js は、ブラウザとNodeテスト
 | commentFontSize | --comment-font-size: 整数px |
 | firstCommentFontSize | --first-comment-font-size: 整数px |
 
-同じ設定の再取得ではsetProperty、設定通知、表示領域再調整を行わない。テーマ、フォント、文字サイズのいずれかが変わった場合は、全変数の更新後に既存fitCommentsToViewport()を1回だけ呼ぶ。anonymousFirstCommentBigだけの変更ではCSSとfitを変更せず、現在設定だけを通知する。
+同じ設定の再取得ではsetProperty、設定通知、表示領域再調整を行わない。テーマ、フォント、文字サイズ、レトロ枠のいずれかが変わった場合は、全変数の更新後に既存fitCommentsToViewport()を1回だけ呼ぶ。anonymousFirstCommentBigだけの変更ではCSSとfitを変更せず、現在設定だけを通知する。
 
-roundedを選択した時だけ、固定ID `first-comment-big-rounded-font` のstylesheet要素を追加し、Google Fontsの `M PLUS Rounded 1c` 太さ700を読み込む。要素が既にあれば再追加せず、roundedから別presetへ戻した後に再選択しても1個のままとする。DOM操作またはネットワーク取得に失敗しても例外をコメント処理へ伝播させず、固定font stackのBIZ UDPゴシック、游ゴシックなどへフォールバックする。他の3presetでは外部フォントを読み込まない。
+roundedを選択した時だけ、固定ID `first-comment-big-rounded-font` のstylesheet要素を追加し、Google Fontsの `M PLUS Rounded 1c` 太さ700を読み込む。要素が既にあれば再追加せず、roundedから別presetへ戻した後に再選択しても1個のままとする。DOM操作またはネットワーク取得に失敗しても例外をコメント処理へ伝播させず、固定font stackのBIZ UDPゴシック、游ゴシックなどへフォールバックする。他の4presetでは外部フォントを読み込まない。
 
 ### 7.5 gift色の保護
 
@@ -240,9 +245,11 @@ TwitCasting匿名は設定OFFでも必ずhistory.rememberを行う。OFF中に�
 
 ### 9.1 正規化
 
-- light/darkを受理する。
+- 4章の7テーマを受理する。
+- 旧5項目を保持してretroWindowFrameのfalseだけを補完する。
+- retroWindowFrameはboolean trueだけをONとして受理する。
 - 不明theme、型違い、欠落themeをlightへ戻す。
-- 4つのfontPresetを受理し、不明値をstandardへ戻す。
+- 5つのfontPresetを受理し、不明値をstandardへ戻す。
 - anonymousFirstCommentBigはboolean trueだけを受理する。
 - 通常文字サイズ16/32/64を受理する。
 - 通常文字サイズ15/65/NaN/Infinity/小数/数値文字列/不正文字列を32へ戻す。
@@ -281,7 +288,7 @@ TwitCasting匿名は設定OFFでも必ずhistory.rememberを行う。OFF中に�
 - light / 32 / 64の初期表示。
 - darkが再読み込みなしで反映される。
 - 2つの文字サイズが独立して反映される。
-- 4種類のフォントが通常、BIG、gift、ownerへ継承される。
+- 5種類のフォントが通常、BIG、gift、ownerへ継承される。
 - 匿名BIGのOFF／ON切替と、OFF中に記録した既観測匿名が通常表示のままであること。
 - 同一設定で不要な再調整をしない。
 - BIGや長文を含む高さ超過分がクリップされ、既存DOMを失わない。
@@ -300,7 +307,7 @@ TwitCasting匿名は設定OFFでも必ずhistory.rememberを行う。OFF中に�
 - fetch、HTTP判定、JSON解析、正規化、CSS適用の例外をコメント購読へ伝播させない。
 - 設定障害をOneSDK初期化失敗として扱わず、購読を解除しない。
 - APIへコメント、ユーザー、配信データを送らない。
-- PUTは既知の5項目だけを保存し、未知キーやプロトタイプをコピーしない。
+- PUTは既知の6項目だけを保存し、未知キーやプロトタイプをコピーしない。
 - 設定値からHTMLを生成せず、設定画面はtextContentまたはフォームvalueを使う。
 - 設定APIは公式localhostエンドポイントだけを使用し、外部へ設定を送らない。rounded選択時だけ指定したGoogle Fonts stylesheetを取得する。
 
@@ -320,12 +327,12 @@ TwitCasting匿名は設定OFFでも必ずhistory.rememberを行う。OFF中に�
 
 ## 12. 実装の完了条件
 
-1. プラグインが5項目だけを公式ストアへ正規化して永続保存する。
+1. プラグインが6項目だけを公式ストアへ正規化して永続保存する。
 2. 設定画面がGET/PUTを使い、ブラウザとプラグインの両方で検証する。
 3. テンプレートが500ms間隔で取得し、通常条件で保存後最大約0.5秒から更新する。
 4. 同一値ではCSS変数と表示領域を再適用しない。
 5. 視覚設定変更時だけ対応CSS変数を更新し、fitCommentsToViewport()を1回実行する。
-6. 設定障害でlight / standard / 32px / 64px / 匿名BIG OFFへ戻り、コメント表示を継続する。
+6. 設定障害でlight / standard / 32px / 64px / 匿名BIG OFF / 枠OFFへ戻り、コメント表示を継続する。
 7. TwitCasting/Kick giftのイベント固有背景色・文字色を維持する。
 8. pagehide/disposeでポーリングを停止する。
 9. Nodeテスト、ブラウザfixture、全JavaScript構文確認がすべて成功する。
@@ -353,3 +360,35 @@ TwitCasting匿名は設定OFFでも必ずhistory.rememberを行う。OFF中に�
 実機確認中に判明したREST境界の問題は、`95771df`（PUTの解析済みbody対応）、`0b98250`（設定画面のREST response envelope対応）、`d50430a`（テンプレート設定クライアントのREST response envelope対応）で修正済みである。
 
 ダークテーマ時のneutral gift配色は独立タスクで実装・検証済みである。任意背景色、任意文字色、その他のテーマエディタ機能は追加していない。
+
+## 14. v1.2.0 レトロ表示
+
+既存light/darkの本文・区切り線・neutral gift色は変更しない。追加配色のneutral giftは本文背景・文字と同色とする。有効なTwitCasting/Kick gift固有色は上書きしない。
+
+| theme | 背景 | 本文 | 区切り線 | タイトル背景 | タイトル文字 |
+| --- | --- | --- | --- | --- | --- |
+| light | #ffffff | #000000 | #d8d8d8 | #000080 | #ffffff |
+| dark | #0b0b0b | #ffffff | #333333 | #333333 | #ffffff |
+| classic-gray | #c0c0c0 | #000000 | #808080 | #000080 | #ffffff |
+| blue-gray | #d4dce4 | #182838 | #8798a8 | #24486b | #ffffff |
+| monochrome | #181818 | #e0e0e0 | #606060 | #404040 | #ffffff |
+| amber | #171109 | #ffcc66 | #70552b | #3b2b12 | #ffcc66 |
+| green-crt | #09130c | #9be6a8 | #356342 | #173823 | #b8f0c2 |
+
+テーマ変更時は従来の5色変数に加え、--retro-title-backgroundと--retro-title-text-colorを更新する。枠変更時はルートのdata-retro-window-frame属性だけを切り替える。枠OFFでは装飾をdisplay:noneにし、コメント領域は従来のinset:0。ONではコメント一覧の兄弟要素に外周2pxと22pxのタイトル帯を表示し、コメント領域を上24px・左右下2pxへ内側に寄せる。固定文字「コメント」は静的HTMLで、aria-hidden、pointer-events:none。コメント子要素へ枠を追加せず、100件制限・クリップ・判定ロジックには触れない。
+
+旧5項目の妥当値はそのまま保持し、不足するretroWindowFrameだけfalseで補完して一度保存する。プラグインとテンプレートは同じ版へ更新する。旧版へのダウングレードや新旧混在時の新テーマ・枠の保存は保証しない。自由色、任意フォント、フレームの個別色・タイトル編集は非目標。
+
+Nodeで正規化、API保存・再起動、差分適用、同値no-op、失敗時枠OFFを検証する。ブラウザで旧light/dark・枠OFF一致、7テーマの枠ON/OFF、390px幅・通常OBS幅・短い領域、および既存fixtureを検証する。13章は既存機能の実機記録であり、v1.2.0のWindows実機結果は15章に記録する。
+
+### v1.2.0 明朝体プリセット
+
+明朝体（mincho）はOSのローカルフォントを使います。Windowsでは游明朝、macOSではヒラギノ明朝系、利用できない場合はserifへフォールバックします。フォントの同梱や外部読込は行いません。テーマとは独立して選択できます。明朝体はWindows＋わんコメ＋OBSで実機確認済みです。macOSのヒラギノ明朝描画は未確認です。
+
+font stackは `"Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Hiragino Mincho Pro", serif` とする。既存4値の保存値・font stackとroundedのGoogle Fonts処理は変更しない。6項目の設定構造とv1.2.0のバージョンは維持する。
+
+## 15. v1.2.0 Windows実機確認結果
+
+ユーザーからの実機確認報告に基づく記録。
+
+v1.2.0はWindows＋わんコメ＋OBSで、7テーマ切り替え、レトロ枠ON/OFFと固定タイトル「コメント」、通常コメント、初コメBIG、ギフト表示と固有色維持、明朝体、クラシックグレー＋明朝体、アンバー＋明朝体を確認済みです。今回の配信者本人コメントの実機確認とmacOSのヒラギノ明朝描画は未確認です。owner判定ロジックは変更していません。

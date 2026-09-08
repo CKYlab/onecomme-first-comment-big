@@ -7,6 +7,8 @@
   --comment-border-color: #d8d8d8;
   --gift-neutral-background: #ffffff;
   --gift-neutral-text-color: #000000;
+  --retro-title-background: #000080;
+  --retro-title-text-color: #ffffff;
   --comment-padding-x: 16px;
   --comment-padding-y: 10px;
   --gift-image-size: 1.65em;
@@ -34,6 +36,34 @@ body {
 
 body {
   position: relative;
+}
+
+#retro-window-frame {
+  display: none;
+  position: absolute;
+  inset: 0;
+  border: 2px solid;
+  border-color: #f3f3f3 #555555 #555555 #f3f3f3;
+  pointer-events: none;
+}
+
+.retro-window-title {
+  height: 22px;
+  padding: 0 6px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background: var(--retro-title-background, #000080);
+  color: var(--retro-title-text-color, #ffffff);
+  font: 700 12px / 22px "Yu Gothic UI", "Yu Gothic", Meiryo, sans-serif;
+}
+
+:root[data-retro-window-frame="true"] #retro-window-frame {
+  display: block;
+}
+
+:root[data-retro-window-frame="true"] #comments {
+  inset: 24px 2px 2px;
 }
 
 #comments {

@@ -12,6 +12,7 @@
     commentFontSize: 32,
     firstCommentFontSize: 64,
     anonymousFirstCommentBig: false,
+    retroWindowFrame: false,
   })
 
   const FONT_PRESETS = Object.freeze({
@@ -19,6 +20,7 @@
     meiryo: 'Meiryo, "Yu Gothic UI", "Yu Gothic", sans-serif',
     'biz-ud': '"BIZ UDPGothic", "Yu Gothic UI", Meiryo, sans-serif',
     rounded: '"M PLUS Rounded 1c", "BIZ UDPGothic", "Yu Gothic UI", Meiryo, sans-serif',
+    mincho: '"Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Hiragino Mincho Pro", serif',
   })
   const ROUNDED_FONT_STYLESHEET_ID = 'first-comment-big-rounded-font'
   const ROUNDED_FONT_STYLESHEET_URL =
@@ -31,6 +33,8 @@
       commentBorderColor: '#d8d8d8',
       giftNeutralBackground: '#ffffff',
       giftNeutralTextColor: '#000000',
+      retroTitleBackground: '#000080',
+      retroTitleTextColor: '#ffffff',
     }),
     dark: Object.freeze({
       panelBackground: '#0b0b0b',
@@ -38,6 +42,53 @@
       commentBorderColor: '#333333',
       giftNeutralBackground: '#222222',
       giftNeutralTextColor: '#ffffff',
+      retroTitleBackground: '#333333',
+      retroTitleTextColor: '#ffffff',
+    }),
+    'classic-gray': Object.freeze({
+      panelBackground: '#c0c0c0',
+      commentTextColor: '#000000',
+      commentBorderColor: '#808080',
+      giftNeutralBackground: '#c0c0c0',
+      giftNeutralTextColor: '#000000',
+      retroTitleBackground: '#000080',
+      retroTitleTextColor: '#ffffff',
+    }),
+    'blue-gray': Object.freeze({
+      panelBackground: '#d4dce4',
+      commentTextColor: '#182838',
+      commentBorderColor: '#8798a8',
+      giftNeutralBackground: '#d4dce4',
+      giftNeutralTextColor: '#182838',
+      retroTitleBackground: '#24486b',
+      retroTitleTextColor: '#ffffff',
+    }),
+    monochrome: Object.freeze({
+      panelBackground: '#181818',
+      commentTextColor: '#e0e0e0',
+      commentBorderColor: '#606060',
+      giftNeutralBackground: '#181818',
+      giftNeutralTextColor: '#e0e0e0',
+      retroTitleBackground: '#404040',
+      retroTitleTextColor: '#ffffff',
+    }),
+    amber: Object.freeze({
+      panelBackground: '#171109',
+      commentTextColor: '#ffcc66',
+      commentBorderColor: '#70552b',
+      giftNeutralBackground: '#171109',
+      giftNeutralTextColor: '#ffcc66',
+      retroTitleBackground: '#3b2b12',
+      retroTitleTextColor: '#ffcc66',
+    }),
+    'green-crt': Object.freeze({
+      panelBackground: '#09130c',
+      commentTextColor: '#9be6a8',
+      commentBorderColor: '#356342',
+      giftNeutralBackground: '#09130c',
+      giftNeutralTextColor: '#9be6a8',
+      retroTitleBackground: '#173823',
+      retroTitleTextColor: '#b8f0c2',
     }),
   })
 
@@ -57,7 +108,9 @@
       ? input
       : {}
     return {
-      theme: source.theme === 'dark' ? 'dark' : 'light',
+      theme: typeof source.theme === 'string' && Object.prototype.hasOwnProperty.call(THEME_COLORS, source.theme)
+        ? source.theme
+        : 'light',
       fontPreset: Object.prototype.hasOwnProperty.call(FONT_PRESETS, source.fontPreset)
         ? source.fontPreset
         : 'standard',
@@ -68,6 +121,7 @@
         ? source.firstCommentFontSize
         : 64,
       anonymousFirstCommentBig: source.anonymousFirstCommentBig === true,
+      retroWindowFrame: source.retroWindowFrame === true,
     }
   }
 
@@ -77,7 +131,8 @@
       a.fontPreset === b.fontPreset &&
       a.commentFontSize === b.commentFontSize &&
       a.firstCommentFontSize === b.firstCommentFontSize &&
-      a.anonymousFirstCommentBig === b.anonymousFirstCommentBig
+      a.anonymousFirstCommentBig === b.anonymousFirstCommentBig &&
+      a.retroWindowFrame === b.retroWindowFrame
   }
 
   function isSettingsResponse(value) {
@@ -142,6 +197,13 @@
         rootElement.style.setProperty('--comment-border-color', colors.commentBorderColor)
         rootElement.style.setProperty('--gift-neutral-background', colors.giftNeutralBackground)
         rootElement.style.setProperty('--gift-neutral-text-color', colors.giftNeutralTextColor)
+        rootElement.style.setProperty('--retro-title-background', colors.retroTitleBackground)
+        rootElement.style.setProperty('--retro-title-text-color', colors.retroTitleTextColor)
+        visualChanged = true
+      }
+      if (next.retroWindowFrame !== lastApplied.retroWindowFrame) {
+        if (next.retroWindowFrame) rootElement.setAttribute('data-retro-window-frame', 'true')
+        else rootElement.removeAttribute('data-retro-window-frame')
         visualChanged = true
       }
       if (next.fontPreset !== lastApplied.fontPreset) {
